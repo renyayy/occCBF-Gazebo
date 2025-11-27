@@ -39,33 +39,33 @@ def generate_launch_description():
     )
 
     # 3. 動的障害物のスポーン (名前空間: obstacle)
-    # X=15.0, Y=4.0 あたりに出現させる
+    # X=-1.0, Y=-2.0 あたりに出現させる
     spawn_obstacle = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
         arguments=[
             '-entity', 'moving_obstacle',
             '-file', obstacle_sdf_path,
-            '-x', '15.0',
-            '-y', '4.0',
-            '-z', '0.5',
+            '-x', '-2.0',
+            '-y', '-2.0',
+            '-z', '0.25',
             '-robot_namespace', 'obstacle' # ここで名前空間を分離
         ],
         output='screen'
     )
 
     # 4. 自機(TurtleBot3)のスポーン (名前空間: なし = グローバル)
-    # X=10.0, Y=7.5 あたりに出現させる
+    # X=0.0, Y=0.0 (中心) に出現させる
     spawn_tb3 = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
         arguments=[
             '-entity', 'turtlebot3_ego',
             '-file', tb3_sdf_path,
-            '-x', '10.0',
-            '-y', '7.5',
+            '-x', '0.0',
+            '-y', '0.0',
             '-z', '0.01',
-            '-Y', '0.0' # 向き(Yaw)
+            '-Y', '-1.5708' # 向き(Yaw)
         ],
         output='screen'
     )
