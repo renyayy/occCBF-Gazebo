@@ -28,7 +28,7 @@ class ObstacleController(Node):
         self.target_pos = [2.0, -2.0]
         self.current_pos = None
         self.is_moving = True
-        self.speed = 0.2  # Linear speed in m/s
+        self.speed = 0.1  # Linear speed in m/s
         self.tolerance = 0.1 # Distance tolerance to stop
 
         self.get_logger().info('Obstacle Controller Started')

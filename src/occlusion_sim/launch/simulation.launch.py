@@ -78,12 +78,21 @@ def generate_launch_description():
         output='screen'
     )
 
-    # 6. LaunchDescriptionの生成
+    # 6. 障害物コントローラーノードの起動
+    obstacle_controller_node = Node(
+        package='occlusion_sim',
+        executable='obstacle_controller.py',
+        name='obstacle_controller',
+        output='screen'
+    )
+
+    # 7. LaunchDescriptionの生成
     ld = LaunchDescription()
     ld.add_action(gzserver_cmd)
     ld.add_action(gzclient_cmd)
     ld.add_action(spawn_obstacle)
     ld.add_action(spawn_tb3)
     ld.add_action(supervisor_node)
+    ld.add_action(obstacle_controller_node)
 
     return ld
