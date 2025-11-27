@@ -70,11 +70,20 @@ def generate_launch_description():
         output='screen'
     )
 
-    # 5. LaunchDescriptionの生成
+    # 5. シミュレーション監視ノードの起動
+    supervisor_node = Node(
+        package='occlusion_sim',
+        executable='simulation_supervisor.py',
+        name='simulation_supervisor',
+        output='screen'
+    )
+
+    # 6. LaunchDescriptionの生成
     ld = LaunchDescription()
     ld.add_action(gzserver_cmd)
     ld.add_action(gzclient_cmd)
     ld.add_action(spawn_obstacle)
     ld.add_action(spawn_tb3)
+    ld.add_action(supervisor_node)
 
     return ld

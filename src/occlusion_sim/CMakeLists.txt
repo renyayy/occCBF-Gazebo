@@ -31,6 +31,7 @@ install(
 
 install(PROGRAMS
   scripts/obstacle_controller.py
+  scripts/simulation_supervisor.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
