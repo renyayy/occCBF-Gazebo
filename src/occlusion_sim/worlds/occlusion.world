@@ -15,7 +15,7 @@
     </gui>
 
     <model name='cylinder_1'>
-      <pose>-0.5 -0.6 0.25 0 0 0</pose>
+      <pose>-0.65 -0.6 0.25 0 0 0</pose>
       <static>true</static>
       <link name='link'>
         <collision name='collision'>
@@ -34,7 +34,7 @@
     </model>
 
     <model name='cylinder_2'>
-      <pose>-0.4 -0.9 0.25 0 0 0</pose>
+      <pose>-0.55 -0.9 0.25 0 0 0</pose>
       <static>true</static>
       <link name='link'>
         <collision name='collision'>
@@ -53,7 +53,7 @@
     </model>
 
     <model name='cylinder_3'>
-      <pose>-0.3 -1.2 0.25 0 0 0</pose>
+      <pose>-0.45 -1.2 0.25 0 0 0</pose>
       <static>true</static>
       <link name='link'>
         <collision name='collision'>
@@ -72,7 +72,7 @@
     </model>
 
     <model name='cylinder_4'>
-      <pose>-0.2 -1.5 0.25 0 0 0</pose>
+      <pose>-0.35 -1.5 0.25 0 0 0</pose>
       <static>true</static>
       <link name='link'>
         <collision name='collision'>
