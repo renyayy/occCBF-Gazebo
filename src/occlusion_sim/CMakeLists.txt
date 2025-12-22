@@ -7,6 +7,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -32,7 +33,11 @@ install(
 install(PROGRAMS
   scripts/obstacle_controller.py
   scripts/simulation_supervisor.py
+  scripts/cbf_wrapper_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
+# Pythonパッケージ (occlusion_simフォルダ) をインストール
+ament_python_install_package(occlusion_sim)
 
 ament_package()
