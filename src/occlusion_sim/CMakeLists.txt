@@ -25,7 +25,7 @@ endif()
 
 # launch/ ディレクトリ全体を 'share/occlusion_sim' にインストール
 install(
-  DIRECTORY launch worlds models
+  DIRECTORY launch worlds models urdf
   DESTINATION share/${PROJECT_NAME}
 )
 
