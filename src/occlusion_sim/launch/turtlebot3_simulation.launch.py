@@ -39,7 +39,7 @@ def generate_launch_description():
     )
 
     # 3. 動的障害物のスポーン (名前空間: obstacle)
-    # X=-1.0, Y=-2.0 あたりに出現させる
+    # X=-2.0, Y=-5.0 に出現させ、Y=5.0まで移動
     spawn_obstacle = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
@@ -47,7 +47,7 @@ def generate_launch_description():
             '-entity', 'moving_obstacle',
             '-file', obstacle_sdf_path,
             '-x', '-2.0',
-            '-y', '-2.0',
+            '-y', '-5.0',
             '-z', '0.25',
             '-robot_namespace', 'obstacle' # ここで名前空間を分離
         ],

@@ -1,8 +1,7 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, RegisterEventHandler
-from launch.event_handlers import OnProcessExit
+from launch.actions import ExecuteProcess
 from launch_ros.actions import Node
 
 def generate_launch_description():
@@ -30,18 +29,18 @@ def generate_launch_description():
         ),
 
         # 3. Moving Obstacle (障害物) のSpawn
-        # x=3.0, y=0.0 の位置に出現させる
+        # x=3.0, y=-3.0 の位置に出現させ、y=3.0まで移動
         Node(
             package='gazebo_ros',
             executable='spawn_entity.py',
-            arguments=['-entity', 'moving_cylinder', '-file', obs_sdf_file, '-x', '3.0', '-y', '0.0', '-z', '0.5'],
+            arguments=['-entity', 'moving_cylinder', '-file', obs_sdf_file, '-x', '3.0', '-y', '-3.0', '-z', '0.1'],
             output='screen'
         ),
 
         # 4. 障害物を動かすノード
         Node(
             package='occlusion_sim',
-            executable='obstacle_controller.py', # または .pyなし (設定による)
+            executable='obstacle_controller.py',
             output='screen'
         ),
 
