@@ -1,4 +1,4 @@
-# Occlusion Sim
+# Gazebo simulator (Occlusion-CBF)
 
 ## Build
 ```bash
@@ -16,7 +16,7 @@ ros2 launch occlusion_sim mvp_simulation.launch.py
 ros2 run occlusion_sim cbf_wrapper_node.py
 ```
 
-## Controller選択
+## Select Controller 
 `cbf_wrapper_node.py` 内でコメントアウトを切り替え:
 
 ```python
