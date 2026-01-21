@@ -16,6 +16,11 @@
       </visual>
       <collision name="collision">
         <geometry><cylinder><radius>0.3</radius><length>0.2</length></cylinder></geometry>
+        <surface>
+          <friction>
+            <ode><mu>0.0</mu><mu2>0.0</mu2></ode>
+          </friction>
+        </surface>
       </collision>
     </link>
     <link name="arrow">
