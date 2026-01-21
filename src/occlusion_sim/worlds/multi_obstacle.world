@@ -4,15 +4,35 @@
     <include><uri>model://sun</uri></include>
     <include><uri>model://ground_plane</uri></include>
 
+    <!-- Movement area visualization (24x13m, centered at (12, 7.5)) -->
+    <model name='movement_area'>
+      <pose>12.0 7.5 0.001 0 0 0</pose>
+      <static>true</static>
+      <link name='area'>
+        <visual name='visual'>
+          <geometry>
+            <box><size>24.0 13.0 0.001</size></box>
+          </geometry>
+          <material>
+            <ambient>0.3 0.5 0.3 1</ambient>
+            <diffuse>0.3 0.5 0.3 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
     <gui fullscreen='0'>
       <camera name='user_camera'>
-        <pose>3.0 0.0 15.0 0 1.5708 0</pose>
+        <!-- 真上視点: マップ中心(12, 7.5)を見下ろす -->
+        <pose>12.0 7.5 30.0 0 1.5708 0</pose>
         <view_controller>orbit</view_controller>
       </camera>
     </gui>
 
-    <model name='goal_marker'>
-      <pose>6.0 -2.0 0.01 0 0 0</pose>
+    <!-- Start marker (green) -->
+    <model name='start_marker'>
+      <pose>1.0 7.5 0.01 0 0 0</pose>
       <static>true</static>
       <link name='link'>
         <visual name='vis'>
@@ -20,6 +40,21 @@
           <material>
             <ambient>0 1 0 1</ambient>
             <diffuse>0 1 0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Goal marker (red) -->
+    <model name='goal_marker'>
+      <pose>20.0 7.5 0.01 0 0 0</pose>
+      <static>true</static>
+      <link name='link'>
+        <visual name='vis'>
+          <geometry><sphere><radius>0.15</radius></sphere></geometry>
+          <material>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
           </material>
         </visual>
       </link>

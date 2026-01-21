@@ -13,24 +13,24 @@ class MultiObstacleController(Node):
     def __init__(self):
         super().__init__('multi_obstacle_controller')
         
-        # 移動範囲制限
-        self.X_MIN, self.X_MAX = -10.0, 10.0
-        self.Y_MIN, self.Y_MAX = -10.0, 10.0
+        # 移動範囲制限 (safe_control/dynamic_env準拠: 24x15m)
+        self.X_MIN, self.X_MAX = 0.0, 24.0
+        self.Y_MIN, self.Y_MAX = 1.0, 14.0
         
         random.seed(42)
         self.obstacles = {
-            'obs_0': {'mode': 1, 'v_max': 0.3, 'theta': random.uniform(-math.pi, math.pi),
+            'obs_0': {'mode': 1, 'v_max': 0.5, 'theta': random.uniform(-math.pi, math.pi),
                       'state': None},
-            'obs_1': {'mode': 1, 'v_max': 0.3, 'theta': random.uniform(-math.pi, math.pi),
+            'obs_1': {'mode': 1, 'v_max': 0.5, 'theta': random.uniform(-math.pi, math.pi),
                       'state': None},
-            'obs_2': {'mode': 1, 'v_max': 0.3, 'theta': random.uniform(-math.pi, math.pi),
+            'obs_2': {'mode': 1, 'v_max': 0.5, 'theta': random.uniform(-math.pi, math.pi),
                       'state': None},
-            'obs_3': {'mode': 1, 'v_max': 0.3, 'theta': random.uniform(-math.pi, math.pi),
+            'obs_3': {'mode': 1, 'v_max': 0.5, 'theta': random.uniform(-math.pi, math.pi),
                       'state': None},
-            'obs_4': {'mode': 1, 'v_max': 0.3, 'theta': random.uniform(-math.pi, math.pi),
+            'obs_4': {'mode': 1, 'v_max': 0.5, 'theta': random.uniform(-math.pi, math.pi),
                       'state': None},
         }
-        self.radius = 0.3
+        self.radius = 0.25
         
         for name in self.obstacles:
             self.create_subscription(Odometry, f'/{name}/odom', 

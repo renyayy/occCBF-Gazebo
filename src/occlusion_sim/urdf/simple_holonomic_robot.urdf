@@ -6,8 +6,8 @@
       <geometry>
         <cylinder radius="0.25" length="0.2"/>
       </geometry>
-      <material name="blue">
-        <color rgba="0 0 0.8 1"/>
+      <material name="purple">
+        <color rgba="0.5 0 0.5 1"/>
       </material>
     </visual>
     <collision>
@@ -21,30 +21,8 @@
     </inertial>
   </link>
 
-  <!-- Arrow for direction visualization -->
-  <link name="arrow">
-    <visual>
-      <origin xyz="0.15 0 0" rpy="0 1.5708 0"/>
-      <geometry>
-        <cylinder radius="0.02" length="0.2"/>
-      </geometry>
-      <material name="orange">
-        <color rgba="1 0.5 0 1"/>
-      </material>
-    </visual>
-  </link>
-  <joint name="arrow_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="arrow"/>
-    <origin xyz="0 0 0.15" rpy="0 0 0"/>
-  </joint>
-
   <gazebo reference="base_link">
-    <material>Gazebo/Blue</material>
-  </gazebo>
-
-  <gazebo reference="arrow">
-    <material>Gazebo/Orange</material>
+    <material>Gazebo/Purple</material>
   </gazebo>
 
   <gazebo>

@@ -2,3 +2,4 @@ install/
 build/
 log/
 .docs/
+CLAUDE.md

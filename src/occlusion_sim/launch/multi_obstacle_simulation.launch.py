@@ -8,13 +8,15 @@ def generate_launch_description():
     pkg = get_package_share_directory('occlusion_sim')
     urdf = os.path.join(pkg, 'urdf', 'simple_holonomic_robot.urdf')
     world = os.path.join(pkg, 'worlds', 'multi_obstacle.world')
+    rviz_config = os.path.join(pkg, 'rviz', 'sensor_viz.rviz')
 
+    # Obstacle positions (safe_control/dynamic_env準拠: マップ中央〜右側)
     obstacles = [
-        {'name': 'obs_0', 'x': 3.0, 'y': -2.0},
-        {'name': 'obs_1', 'x': 5.0, 'y': 1.0},
-        {'name': 'obs_2', 'x': 4.0, 'y': -1.0},
-        {'name': 'obs_3', 'x': 2.0, 'y': 3.0},
-        {'name': 'obs_4', 'x': 6.0, 'y': -3.0},
+        {'name': 'obs_0', 'x': 8.0, 'y': 5.0},
+        {'name': 'obs_1', 'x': 10.0, 'y': 9.0},
+        {'name': 'obs_2', 'x': 12.0, 'y': 3.0},
+        {'name': 'obs_3', 'x': 14.0, 'y': 11.0},
+        {'name': 'obs_4', 'x': 16.0, 'y': 7.0},
     ]
 
     ld = LaunchDescription([
@@ -22,8 +24,9 @@ def generate_launch_description():
             cmd=['gazebo', '--verbose', world, '-s', 'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so'],
             output='screen'
         ),
+        # Ego robot spawn at start position (1.0, 7.5)
         Node(package='gazebo_ros', executable='spawn_entity.py',
-             arguments=['-entity', 'ego_robot', '-file', urdf, '-x', '0', '-y', '0', '-z', '0.2'],
+             arguments=['-entity', 'ego_robot', '-file', urdf, '-x', '1.0', '-y', '7.5', '-z', '0.2'],
              output='screen'),
     ])
 
@@ -43,4 +46,6 @@ def generate_launch_description():
 
     ld.add_action(Node(package='occlusion_sim', executable='multi_obstacle_controller.py', output='screen'))
     ld.add_action(Node(package='occlusion_sim', executable='cbf_wrapper_node.py', output='screen'))
+    ld.add_action(Node(package='occlusion_sim', executable='sensor_visualizer_node.py', output='screen'))
+    ld.add_action(Node(package='rviz2', executable='rviz2', arguments=['-d', rviz_config], output='screen'))
     return ld

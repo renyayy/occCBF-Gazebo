@@ -1,0 +1,121 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 30
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Name: TF
+      Marker Scale: 1
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: FoV Fill
+      Topic:
+        Value: /sensor_viz/fov
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: FoV Outline
+      Topic:
+        Value: /sensor_viz/fov_outline
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Sensing Range
+      Topic:
+        Value: /sensor_viz/sensing_range
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Occlusion
+      Topic:
+        Value: /sensor_viz/occlusion
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Obstacles
+      Topic:
+        Value: /sensor_viz/obstacles
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Start
+      Topic:
+        Value: /sensor_viz/start
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Goal
+      Topic:
+        Value: /sensor_viz/goal
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Boundary
+      Topic:
+        Value: /sensor_viz/boundary
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: odom
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 30
+      Enable Stereo Rendering:
+        Value: false
+      Focal Point:
+        X: 12
+        Y: 7.5
+        Z: 0
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.01
+      Pitch: 1.5708
+      Target Frame: <Fixed Frame>
+      Yaw: 0
+    Saved: ~

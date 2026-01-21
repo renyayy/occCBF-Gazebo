@@ -26,7 +26,7 @@ endif()
 
 # launch/ ディレクトリ全体を 'share/occlusion_sim' にインストール
 install(
-  DIRECTORY launch worlds models urdf
+  DIRECTORY launch worlds models urdf rviz
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -35,6 +35,7 @@ install(PROGRAMS
   scripts/simulation_supervisor.py
   scripts/cbf_wrapper_node.py
   scripts/multi_obstacle_controller.py
+  scripts/sensor_visualizer_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -18,10 +18,10 @@ class CBFWrapperNode(Node):
     def __init__(self):
         super().__init__('cbf_wrapper_node')
 
-        # 設定
+        # 設定 (safe_control/dynamic_env準拠)
         self.dt = 0.05
-        self.goal = np.array([[6.0], [-2.0], [0.0]])
-        self.obstacle_radius = 0.3
+        self.goal = np.array([[20.0], [7.5], [0.0]])
+        self.obstacle_radius = 0.25
         
         self.robot_spec = {
             'model': 'DoubleIntegrator2D',
