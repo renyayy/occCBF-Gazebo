@@ -13,14 +13,18 @@ class MultiObstacleController(Node):
     def __init__(self):
         super().__init__('multi_obstacle_controller')
         
+        # 移動範囲制限
+        self.X_MIN, self.X_MAX = -10.0, 10.0
+        self.Y_MIN, self.Y_MAX = -10.0, 10.0
+        
         random.seed(42)
         self.obstacles = {
-            'obs_0': {'mode': 1, 'v_max': 0.4, 'theta': random.uniform(-math.pi, math.pi),
-                      'y_min': -3.0, 'y_max': 3.0, 'state': None},
-            'obs_1': {'mode': 1, 'v_max': 0.5, 'theta': random.uniform(-math.pi, math.pi),
-                      'y_min': -2.0, 'y_max': 4.0, 'state': None},
+            'obs_0': {'mode': 1, 'v_max': 0.3, 'theta': random.uniform(-math.pi, math.pi),
+                      'state': None},
+            'obs_1': {'mode': 1, 'v_max': 0.3, 'theta': random.uniform(-math.pi, math.pi),
+                      'state': None},
             'obs_2': {'mode': 1, 'v_max': 0.3, 'theta': random.uniform(-math.pi, math.pi),
-                      'y_min': -4.0, 'y_max': 2.0, 'state': None},
+                      'state': None},
         }
         self.radius = 0.3
         
@@ -41,6 +45,7 @@ class MultiObstacleController(Node):
             if obs['state'] is None:
                 continue
             
+            x = obs['state'].pose.pose.position.x
             y = obs['state'].pose.pose.position.y
             theta = obs['theta']
             v_max = obs['v_max']
@@ -53,18 +58,27 @@ class MultiObstacleController(Node):
             vx = v_max * math.cos(theta)
             vy = v_max * math.sin(theta)
             
-            # Reflect at y bounds
-            if y >= obs['y_max']:
-                obs['theta'] = -obs['theta']
+            # Y boundary reflection
+            if y >= self.Y_MAX:
                 vy = -abs(vy)
-            elif y <= obs['y_min']:
                 obs['theta'] = -obs['theta']
+            elif y <= self.Y_MIN:
                 vy = abs(vy)
+                obs['theta'] = -obs['theta']
+            
+            # X boundary reflection
+            if x >= self.X_MAX:
+                vx = -abs(vx)
+                obs['theta'] = math.pi - obs['theta']
+            elif x <= self.X_MIN:
+                vx = abs(vx)
+                obs['theta'] = math.pi - obs['theta']
+            
+            obs['theta'] = math.atan2(math.sin(obs['theta']), math.cos(obs['theta']))
             
             cmd = Twist()
             cmd.linear.x = float(vx)
             cmd.linear.y = float(vy)
-            cmd.angular.z = float(obs['theta'])  # Rotate to heading
             self.cmd_pubs[name].publish(cmd)
             
             state = Odometry()
