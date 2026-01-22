@@ -91,6 +91,22 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Depth: 5
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Ground
+      Topic:
+        Value: /sensor_viz/ground
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Ego Robot
+      Topic:
+        Value: /sensor_viz/ego_robot
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Depth: 5
   Global Options:
     Background Color: 48; 48; 48
     Fixed Frame: odom

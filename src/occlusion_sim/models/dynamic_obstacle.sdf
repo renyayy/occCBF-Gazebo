@@ -23,16 +23,6 @@
         </surface>
       </collision>
     </link>
-    <link name="arrow">
-      <pose>0.25 0 0.15 0 1.5708 0</pose>
-      <visual name="arrow_visual">
-        <geometry><cylinder><radius>0.03</radius><length>0.3</length></cylinder></geometry>
-        <material><ambient>1 0.5 0 1</ambient><diffuse>1 0.5 0 1</diffuse></material>
-      </visual>
-    </link>
-    <joint name="arrow_joint" type="fixed">
-      <parent>base_link</parent><child>arrow</child>
-    </joint>
     <plugin name="planar_move" filename="libgazebo_ros_planar_move.so">
       <ros><namespace>/obs_{id}</namespace></ros>
       <update_rate>100</update_rate>

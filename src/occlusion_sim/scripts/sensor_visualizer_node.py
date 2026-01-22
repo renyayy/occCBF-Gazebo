@@ -19,7 +19,7 @@ class SensorVisualizerNode(Node):
         self.cam_range = 10.0  
         self.sensing_range = 10.0
         self.robot_radius = 0.25
-        self.obstacle_radius = 0.25
+        self.obstacle_radius = 0.3
 
         # Start/Goal positions
         self.start_pos = (1.0, 7.5)
@@ -49,6 +49,8 @@ class SensorVisualizerNode(Node):
         self.start_pub = self.create_publisher(Marker, '/sensor_viz/start', 10)
         self.goal_pub = self.create_publisher(Marker, '/sensor_viz/goal', 10)
         self.boundary_pub = self.create_publisher(Marker, '/sensor_viz/boundary', 10)
+        self.ground_pub = self.create_publisher(Marker, '/sensor_viz/ground', 10)
+        self.ego_robot_pub = self.create_publisher(Marker, '/sensor_viz/ego_robot', 10)
 
         # Timer (20Hz)
         self.create_timer(0.05, self.publish_markers)
@@ -83,6 +85,8 @@ class SensorVisualizerNode(Node):
         self.publish_obstacle_markers()
         self.publish_start_goal_markers()
         self.publish_boundary_marker()
+        self.publish_ground_marker()
+        self.publish_ego_robot_marker()
 
     def publish_fov_marker(self):
         marker = Marker()
@@ -274,11 +278,11 @@ class SensorVisualizerNode(Node):
             marker.action = Marker.ADD
             marker.pose.position.x = obs['x']
             marker.pose.position.y = obs['y']
-            marker.pose.position.z = 0.5
+            marker.pose.position.z = 0.1
             marker.pose.orientation.w = 1.0
             marker.scale.x = obs_radius * 2
             marker.scale.y = obs_radius * 2
-            marker.scale.z = 1.0
+            marker.scale.z = 0.2
 
             # Set color to gray to match Gazebo
             marker.color = ColorRGBA(r=0.5, g=0.5, b=0.5, a=0.8)
@@ -342,7 +346,7 @@ class SensorVisualizerNode(Node):
         marker.action = Marker.ADD
         marker.pose.orientation.w = 1.0
         marker.scale.x = 0.1
-        marker.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=0.8)
+        marker.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
 
         # Draw boundary rectangle
         z = 0.01
@@ -353,6 +357,51 @@ class SensorVisualizerNode(Node):
         marker.points.append(Point(x=self.X_MIN, y=self.Y_MIN, z=z))
 
         self.boundary_pub.publish(marker)
+
+    def publish_ground_marker(self):
+        marker = Marker()
+        marker.header.frame_id = 'odom'
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'ground'
+        marker.id = 0
+        marker.type = Marker.CUBE
+        marker.action = Marker.ADD
+
+        # Center of movement area
+        center_x = (self.X_MIN + self.X_MAX) / 2.0
+        center_y = (self.Y_MIN + self.Y_MAX) / 2.0
+        marker.pose.position.x = center_x
+        marker.pose.position.y = center_y
+        marker.pose.position.z = 0.0
+        marker.pose.orientation.w = 1.0
+
+        # Size of movement area
+        marker.scale.x = self.X_MAX - self.X_MIN
+        marker.scale.y = self.Y_MAX - self.Y_MIN
+        marker.scale.z = 0.001
+
+        marker.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
+
+        self.ground_pub.publish(marker)
+
+    def publish_ego_robot_marker(self):
+        marker = Marker()
+        marker.header.frame_id = 'odom'
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'ego_robot'
+        marker.id = 0
+        marker.type = Marker.CYLINDER
+        marker.action = Marker.ADD
+        marker.pose.position.x = self.robot_x
+        marker.pose.position.y = self.robot_y
+        marker.pose.position.z = 0.1
+        marker.pose.orientation.w = 1.0
+        marker.scale.x = self.robot_radius * 2
+        marker.scale.y = self.robot_radius * 2
+        marker.scale.z = 0.2
+        marker.color = ColorRGBA(r=0.5, g=0.0, b=0.5, a=0.9)
+
+        self.ego_robot_pub.publish(marker)
 
 
 def main(args=None):
