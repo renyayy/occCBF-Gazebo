@@ -1,0 +1,3 @@
+[submodule "src/occlusion_sim/safe_control"]
+	path = src/occlusion_sim/safe_control
+	url = https://github.com/parkcart1595/safe_control.git

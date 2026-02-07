@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 """CBF Wrapper Node"""
+import os  
+import sys
+from rclpy.node import Node
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 import numpy as np
 
-from occlusion_sim.safe_control.robots.double_integrator2D import DoubleIntegrator2D
-from occlusion_sim.safe_control.position_control.cbf_qp import CBFQP
-from occlusion_sim.safe_control.position_control.backup_cbf_qp import BackupCBFQP
-from occlusion_sim.safe_control.position_control.mpc_cbf import MPCCBF
-from occlusion_sim.safe_control.position_control.optimal_decay_cbf_qp import OptimalDecayCBFQP
-from occlusion_sim.safe_control.position_control.optimal_decay_mpc_cbf import OptimalDecayMPCCBF
+current_dir = os.path.dirname(os.path.abspath(__file__))
+safe_control_path = os.path.join(current_dir, '..', 'safe_control')
+sys.path.append(safe_control_path)
 
+from robots.double_integrator2D import DoubleIntegrator2D
+from position_control.cbf_qp import CBFQP
+from position_control.backup_cbf_qp import BackupCBFQP
+from position_control.mpc_cbf import MPCCBF
+from position_control.optimal_decay_cbf_qp import OptimalDecayCBFQP
+from position_control.optimal_decay_mpc_cbf import OptimalDecayMPCCBF
 
 class CBFWrapperNode(Node):
     def __init__(self):

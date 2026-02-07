@@ -38,7 +38,9 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Pythonパッケージ (occlusion_simフォルダ) をインストール
-ament_python_install_package(occlusion_sim)
+install(
+  DIRECTORY safe_control
+  DESTINATION lib
+)
 
 ament_package()

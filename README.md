@@ -9,7 +9,7 @@ docker run -itd \
 -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 -v /home/renyayy/Dev/OccCBF/Gazebo_ws:/root/Gazebo_ws \
 --name Gazebo_ws \
-renya/tb3-nav2:latest
+gazebo-ros2_nav2
 ```
 
 ## Build
