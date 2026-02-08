@@ -20,8 +20,6 @@ from position_control.optimal_decay_cbf_qp import OptimalDecayCBFQP
 from position_control.optimal_decay_mpc_cbf import OptimalDecayMPCCBF
 
 from utils.occlusion import OcclusionUtils
-from attitude_control.velocity_tracking_yaw import VelocityTrackingYaw
-from scipy.spatial.transform import Rotation as R
 
 class CBFWrapperNode(Node):
     def __init__(self):
@@ -52,11 +50,6 @@ class CBFWrapperNode(Node):
             barrier_fn=None
         )
 
-        # 向き制御 (速度ベクトル方向に向きを追従)
-        self.robot_spec['w_max'] = 1.0
-        self.attitude_controller = VelocityTrackingYaw(self.robot, self.robot_spec, kp=1.5)
-        self.current_yaw = 0.0
-
         # Controller選択 (使用するControllerをコメント解除)
         # self.controller = CBFQP(self.robot, self.robot_spec, num_obs=10)              # 基本CBF-QP
         self.controller = BackupCBFQP(self.robot, self.robot_spec, num_obs=10)        # バックアップCBF-QP (遮蔽対応)
@@ -80,22 +73,11 @@ class CBFWrapperNode(Node):
         self.get_logger().info('CBF Wrapper Node started')
 
     def odom_cb(self, msg):
-        """エゴロボットの状態 (位置・速度・姿勢) を更新"""
+        """エゴロボットの状態 (位置・速度) を更新"""
         self.X[0, 0] = msg.pose.pose.position.x
         self.X[1, 0] = msg.pose.pose.position.y
         self.X[2, 0] = msg.twist.twist.linear.x
         self.X[3, 0] = msg.twist.twist.linear.y
-
-        # クォータニオン → Yaw角 (向き制御用)
-        quat = [
-            msg.pose.pose.orientation.x,
-            msg.pose.pose.orientation.y,
-            msg.pose.pose.orientation.z,
-            msg.pose.pose.orientation.w
-        ]
-        rot = R.from_quat(quat)
-        self.current_yaw = rot.as_euler('xyz')[2]
-
         self.odom_received = True
 
     def obs_cb(self, msg):
@@ -129,13 +111,8 @@ class CBFWrapperNode(Node):
             self.X, self.obs_list
         )
 
-        # 全障害物数と認識数のログ出力
         total_obs = len(self.obs_list)
         visible_count = len(visible_obs)
-        self.get_logger().info(
-            f'Total: {total_obs}, Visible: {visible_count}',
-            throttle_duration_sec=0.1
-        )
 
         if len(visible_obs) > 0:
             visible_obs_np = np.array(visible_obs)
@@ -148,21 +125,26 @@ class CBFWrapperNode(Node):
         # CBF-QP: 安全制約を満たす制御入力を計算
         try:
             u = self.controller.solve_control_problem(self.X, {'u_ref': u_ref}, visible_obs_np)
-            if u is None or self.controller.status != 'optimal':
-                u = np.zeros((2, 1))
+            if u is None or np.any(np.isnan(u)) or self.controller.status != 'optimal':
+                u = self.robot.stop(self.X)
         except Exception as e:
             self.get_logger().warn(f'QP failed: {e}', throttle_duration_sec=1.0)
-            u = np.zeros((2, 1))
+            u = self.robot.stop(self.X)
 
-        # 向き制御: 現在の速度ベクトル方向に向きを追従
-        current_vel = self.X[2:4]
-        u_yaw = self.attitude_controller.solve_control_problem(
-            robot_state=self.X,
-            current_yaw=self.current_yaw,
-            u=current_vel
+        # CBF効果ログ
+        u_diff = float(np.linalg.norm(u - u_ref))
+        min_dist = float(np.min(np.hypot(
+            visible_obs_np[:, 0] - self.X[0, 0],
+            visible_obs_np[:, 1] - self.X[1, 0]
+        ))) if len(visible_obs_np) > 0 else float('inf')
+        self.get_logger().info(
+            f'Obs: {visible_count}/{total_obs}'
+            f' | CBF: {self.controller.last_intervention} [{self.controller.status}]'
+            f' | Δu: {u_diff:.3f}'
+            f' | MinDist: {min_dist:.2f}'
+            f' | Constraints: {self.controller.last_num_constraints}',
+            throttle_duration_sec=0.1
         )
-
-        angular_z = float(u_yaw[0, 0])
 
         # 加速度 → 速度
         vx = self.X[2, 0] + float(u[0, 0]) * self.dt
@@ -177,7 +159,6 @@ class CBFWrapperNode(Node):
         # 指令値をパブリッシュ
         twist = Twist()
         twist.linear.x, twist.linear.y = float(vx), float(vy)
-        twist.angular.z = angular_z
         self.cmd_pub.publish(twist)
 
 

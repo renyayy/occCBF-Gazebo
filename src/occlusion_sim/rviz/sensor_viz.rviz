@@ -58,7 +58,7 @@ Visualization Manager:
       Enabled: true
       Name: FoV Fill
       Namespaces:
-        fov_fill: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -71,7 +71,7 @@ Visualization Manager:
       Enabled: true
       Name: FoV Outline
       Namespaces:
-        fov_outline: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -211,14 +211,14 @@ Visualization Manager:
         Y: 8.289472579956055
         Z: -1.7685521841049194
       Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05
+      Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6497972011566162
+      Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 4.71818208694458
+      Yaw: 4.714993000030518
     Saved: ~
 Window Geometry:
   Displays:

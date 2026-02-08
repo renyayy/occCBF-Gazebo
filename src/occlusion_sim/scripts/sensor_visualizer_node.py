@@ -9,7 +9,6 @@ from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
 import numpy as np
-import math
 
 # safe_control パスを追加
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -57,7 +56,6 @@ class SensorVisualizerNode(Node):
         # State
         self.robot_x = 0.0
         self.robot_y = 0.0
-        self.robot_yaw = 0.0
         self.odom_received = False
         self.obstacle_states = {}
 
@@ -87,11 +85,6 @@ class SensorVisualizerNode(Node):
     def odom_cb(self, msg):
         self.robot_x = msg.pose.pose.position.x
         self.robot_y = msg.pose.pose.position.y
-        # Extract yaw from quaternion
-        q = msg.pose.pose.orientation
-        siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
-        cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-        self.robot_yaw = math.atan2(siny_cosp, cosy_cosp)
         self.odom_received = True
 
     def obs_cb(self, msg):
