@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Sensor Visualizer Node for RViz2"""
+import os
+import sys
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
@@ -9,17 +11,44 @@ from std_msgs.msg import ColorRGBA
 import numpy as np
 import math
 
+# safe_control パスを追加
+current_dir = os.path.dirname(os.path.abspath(__file__))
+safe_control_path = os.path.join(current_dir, '..', 'safe_control')
+sys.path.append(safe_control_path)
+
+from robots.double_integrator2D import DoubleIntegrator2D
+from utils.occlusion import OcclusionUtils
+
 
 class SensorVisualizerNode(Node):
     def __init__(self):
         super().__init__('sensor_visualizer_node')
 
         # Parameters (safe_control/dynamic_env準拠)
-        self.fov_angle = np.deg2rad(70.0)
-        self.cam_range = 10.0  
         self.sensing_range = 10.0
         self.robot_radius = 0.25
         self.obstacle_radius = 0.3
+
+        # ロボット仕様（cbf_wrapper_nodeと一致）
+        self.robot_spec = {
+            'model': 'DoubleIntegrator2D',
+            'v_max': 1.0,
+            'a_max': 1.0,
+            'radius': self.robot_radius,
+            'sensing_range': self.sensing_range,
+            'backup_cbf': {'T_horizon': 3.0, 'dt_backup': 0.05, 'alpha': 2.0},
+        }
+
+        self.dt = 0.05
+        self.robot = DoubleIntegrator2D(self.dt, self.robot_spec)
+
+        # オクルージョン管理（cbf_wrapper_nodeと同じ）
+        self.occlusion_manager = OcclusionUtils(
+            robot=self.robot,
+            robot_spec=self.robot_spec,
+            sensing_range=self.robot_spec['sensing_range'],
+            barrier_fn=None
+        )
 
         # Start/Goal positions
         self.start_pos = (1.0, 7.5)
@@ -41,8 +70,6 @@ class SensorVisualizerNode(Node):
         self.Y_MIN, self.Y_MAX = 1.0, 14.0
 
         # Publishers
-        self.fov_pub = self.create_publisher(Marker, '/sensor_viz/fov', 10)
-        self.fov_outline_pub = self.create_publisher(Marker, '/sensor_viz/fov_outline', 10)
         self.sensing_range_pub = self.create_publisher(Marker, '/sensor_viz/sensing_range', 10)
         self.occlusion_pub = self.create_publisher(MarkerArray, '/sensor_viz/occlusion', 10)
         self.obstacles_pub = self.create_publisher(MarkerArray, '/sensor_viz/obstacles', 10)
@@ -72,14 +99,14 @@ class SensorVisualizerNode(Node):
         self.obstacle_states[name] = {
             'x': msg.pose.pose.position.x,
             'y': msg.pose.pose.position.y,
-            'radius': self.obstacle_radius
+            'radius': self.obstacle_radius,
+            'vx': msg.twist.twist.linear.x,
+            'vy': msg.twist.twist.linear.y
         }
 
     def publish_markers(self):
         if not self.odom_received:
             return
-        self.publish_fov_marker()
-        self.publish_fov_outline()
         self.publish_sensing_range_marker()
         self.publish_occlusion_markers()
         self.publish_obstacle_markers()
@@ -87,70 +114,6 @@ class SensorVisualizerNode(Node):
         self.publish_boundary_marker()
         self.publish_ground_marker()
         self.publish_ego_robot_marker()
-
-    def publish_fov_marker(self):
-        marker = Marker()
-        marker.header.frame_id = 'odom'
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = 'fov_fill'
-        marker.id = 0
-        marker.type = Marker.TRIANGLE_LIST
-        marker.action = Marker.ADD
-        marker.pose.orientation.w = 1.0
-        marker.scale.x = 1.0
-        marker.scale.y = 1.0
-        marker.scale.z = 1.0
-        marker.color = ColorRGBA(r=1.0, g=1.0, b=0.0, a=0.25)
-
-        resolution = 20
-        angle_left = self.robot_yaw + self.fov_angle / 2
-        angle_right = self.robot_yaw - self.fov_angle / 2
-        angles = np.linspace(angle_right, angle_left, resolution + 1)
-
-        robot_pos = Point(x=self.robot_x, y=self.robot_y, z=0.05)
-
-        for i in range(resolution):
-            p1 = Point(
-                x=self.robot_x + self.cam_range * np.cos(angles[i]),
-                y=self.robot_y + self.cam_range * np.sin(angles[i]),
-                z=0.05
-            )
-            p2 = Point(
-                x=self.robot_x + self.cam_range * np.cos(angles[i + 1]),
-                y=self.robot_y + self.cam_range * np.sin(angles[i + 1]),
-                z=0.05
-            )
-            marker.points.extend([robot_pos, p1, p2])
-
-        self.fov_pub.publish(marker)
-
-    def publish_fov_outline(self):
-        marker = Marker()
-        marker.header.frame_id = 'odom'
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = 'fov_outline'
-        marker.id = 0
-        marker.type = Marker.LINE_STRIP
-        marker.action = Marker.ADD
-        marker.pose.orientation.w = 1.0
-        marker.scale.x = 0.05
-        marker.color = ColorRGBA(r=1.0, g=0.8, b=0.0, a=0.9)
-
-        resolution = 20
-        angle_left = self.robot_yaw + self.fov_angle / 2
-        angle_right = self.robot_yaw - self.fov_angle / 2
-        angles = np.linspace(angle_right, angle_left, resolution + 1)
-
-        marker.points.append(Point(x=self.robot_x, y=self.robot_y, z=0.05))
-        for angle in angles:
-            marker.points.append(Point(
-                x=self.robot_x + self.cam_range * np.cos(angle),
-                y=self.robot_y + self.cam_range * np.sin(angle),
-                z=0.05
-            ))
-        marker.points.append(Point(x=self.robot_x, y=self.robot_y, z=0.05))
-
-        self.fov_outline_pub.publish(marker)
 
     def publish_sensing_range_marker(self):
         marker = Marker()
@@ -175,53 +138,38 @@ class SensorVisualizerNode(Node):
 
         self.sensing_range_pub.publish(marker)
 
-    def circle_tangents(self, p, c, R):
-        """Compute tangent points from point p to circle (center c, radius R)."""
-        p = np.asarray(p, dtype=float)
-        c = np.asarray(c, dtype=float)
-        v = p - c
-        d2 = float(v @ v)
-        R2 = R * R
-
-        if d2 <= R2:
-            return None, None
-
-        x1, y1 = v
-        x0 = R2 * x1 / d2
-        y0 = R2 * y1 / d2
-        k = R * np.sqrt(d2 - R2) / d2
-
-        t1 = np.array([x0 - y1 * k, y0 + x1 * k]) + c
-        t2 = np.array([x0 + y1 * k, y0 - x1 * k]) + c
-        return t1, t2
-
     def publish_occlusion_markers(self):
         marker_array = MarkerArray()
-        robot_pos = np.array([self.robot_x, self.robot_y])
 
-        for idx, (name, obs) in enumerate(self.obstacle_states.items()):
-            obs_center = np.array([obs['x'], obs['y']])
-            obs_radius = obs['radius']
+        # ロボット状態を準備（OcclusionUtils用）
+        robot_state = np.array([[self.robot_x], [self.robot_y], [0.0], [0.0]])
 
-            # Check if obstacle is within sensing range
-            dist = np.linalg.norm(obs_center - robot_pos)
-            if dist > self.sensing_range + obs_radius:
-                continue
+        # 障害物リストを準備（OcclusionUtils用）
+        obs_list = []
+        for name, obs in self.obstacle_states.items():
+            obs_list.append([obs['x'], obs['y'], obs['radius'], obs.get('vx', 0.0), obs.get('vy', 0.0)])
 
-            t1, t2 = self.circle_tangents(robot_pos, obs_center, obs_radius)
-            if t1 is None:
-                continue
+        if len(obs_list) == 0:
+            delete_marker = Marker()
+            delete_marker.header.frame_id = 'odom'
+            delete_marker.header.stamp = self.get_clock().now().to_msg()
+            delete_marker.ns = 'occlusion'
+            delete_marker.action = Marker.DELETEALL
+            marker_array.markers.append(delete_marker)
+            self.occlusion_pub.publish(marker_array)
+            return
 
-            # Extend tangent directions to sensing range
-            dir1 = (t1 - robot_pos)
-            dir1 = dir1 / np.linalg.norm(dir1)
-            dir2 = (t2 - robot_pos)
-            dir2 = dir2 / np.linalg.norm(dir2)
+        obs_array = np.array(obs_list)
 
-            far1 = robot_pos + self.sensing_range * dir1
-            far2 = robot_pos + self.sensing_range * dir2
+        # OcclusionUtilsでフィルタリング（センシング範囲 + オクルージョン考慮）
+        _, occl_scenarios = self.occlusion_manager._filter_visible_and_build_occ(
+            robot_state, obs_array
+        )
 
-            # Create wedge polygon marker (two triangles)
+        # オクルージョンシナリオのポリゴンを直接描画
+        for idx, sc in enumerate(occl_scenarios):
+            poly = sc['poly']  # [t1, t2, far2, far1] (4,2)
+
             marker = Marker()
             marker.header.frame_id = 'odom'
             marker.header.stamp = self.get_clock().now().to_msg()
@@ -236,6 +184,7 @@ class SensorVisualizerNode(Node):
             marker.color = ColorRGBA(r=1.0, g=0.0, b=0.0, a=0.35)
 
             z = 0.04
+            t1, t2, far2, far1 = poly[0], poly[1], poly[2], poly[3]
             # Triangle 1: t1, t2, far2
             marker.points.append(Point(x=float(t1[0]), y=float(t1[1]), z=z))
             marker.points.append(Point(x=float(t2[0]), y=float(t2[1]), z=z))
@@ -247,7 +196,6 @@ class SensorVisualizerNode(Node):
 
             marker_array.markers.append(marker)
 
-        # Delete old markers if obstacles reduced
         if len(marker_array.markers) == 0:
             delete_marker = Marker()
             delete_marker.header.frame_id = 'odom'
@@ -260,14 +208,9 @@ class SensorVisualizerNode(Node):
 
     def publish_obstacle_markers(self):
         marker_array = MarkerArray()
-        robot_pos = np.array([self.robot_x, self.robot_y])
 
         for idx, (name, obs) in enumerate(self.obstacle_states.items()):
-            obs_center = np.array([obs['x'], obs['y']])
             obs_radius = obs['radius']
-
-            dist = np.linalg.norm(obs_center - robot_pos)
-            detected = dist <= self.sensing_range
 
             marker = Marker()
             marker.header.frame_id = 'odom'
