@@ -129,6 +129,14 @@ class CBFWrapperNode(Node):
             self.X, self.obs_list
         )
 
+        # 全障害物数と認識数のログ出力
+        total_obs = len(self.obs_list)
+        visible_count = len(visible_obs)
+        self.get_logger().info(
+            f'Total: {total_obs}, Visible: {visible_count}',
+            throttle_duration_sec=0.1
+        )
+
         if len(visible_obs) > 0:
             visible_obs_np = np.array(visible_obs)
         else:

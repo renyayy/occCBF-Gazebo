@@ -4,3 +4,4 @@ log/
 .docs/
 .venv/
 CLAUDE.md
+*.log
