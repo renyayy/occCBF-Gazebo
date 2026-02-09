@@ -61,23 +61,32 @@ class MultiObstacleController(Node):
             
             vx = v_max * math.cos(theta)
             vy = v_max * math.sin(theta)
-            
-            # Y boundary reflection
-            if y >= self.Y_MAX:
-                vy = -abs(vy)
+
+            # Predict next position
+            dt = 0.05
+            x_new = x + vx * dt
+            y_new = y + vy * dt
+
+            # Y boundary reflection (only when predicted to cross AND moving toward boundary)
+            if y_new >= self.Y_MAX and vy > 0:
                 obs['theta'] = -obs['theta']
-            elif y <= self.Y_MIN:
-                vy = abs(vy)
+                vx = v_max * math.cos(obs['theta'])
+                vy = v_max * math.sin(obs['theta'])
+            elif y_new <= self.Y_MIN and vy < 0:
                 obs['theta'] = -obs['theta']
-            
-            # X boundary reflection
-            if x >= self.X_MAX:
-                vx = -abs(vx)
+                vx = v_max * math.cos(obs['theta'])
+                vy = v_max * math.sin(obs['theta'])
+
+            # X boundary reflection (only when predicted to cross AND moving toward boundary)
+            if x_new >= self.X_MAX and vx > 0:
                 obs['theta'] = math.pi - obs['theta']
-            elif x <= self.X_MIN:
-                vx = abs(vx)
+                vx = v_max * math.cos(obs['theta'])
+                vy = v_max * math.sin(obs['theta'])
+            elif x_new <= self.X_MIN and vx < 0:
                 obs['theta'] = math.pi - obs['theta']
-            
+                vx = v_max * math.cos(obs['theta'])
+                vy = v_max * math.sin(obs['theta'])
+
             obs['theta'] = math.atan2(math.sin(obs['theta']), math.cos(obs['theta']))
             
             cmd = Twist()
