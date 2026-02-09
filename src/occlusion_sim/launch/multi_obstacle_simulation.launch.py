@@ -19,6 +19,8 @@ def generate_launch_description():
         {'name': 'obs_4', 'x': 16.0, 'y': 7.0},
     ]
 
+    sim_time_param = {'use_sim_time': True}
+
     ld = LaunchDescription([
         ExecuteProcess(
             cmd=['gzserver', '--verbose', world, '-s', 'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so'],
@@ -27,6 +29,7 @@ def generate_launch_description():
         # Ego robot spawn at start position (1.0, 7.5)
         Node(package='gazebo_ros', executable='spawn_entity.py',
              arguments=['-entity', 'ego_robot', '-file', urdf, '-x', '1.0', '-y', '7.5', '-z', '0.2'],
+             parameters=[sim_time_param],
              output='screen'),
     ])
 
@@ -42,10 +45,15 @@ def generate_launch_description():
             package='gazebo_ros', executable='spawn_entity.py',
             arguments=['-entity', obs['name'], '-file', tmp_sdf,
                        '-x', str(obs['x']), '-y', str(obs['y']), '-z', '0.1'],
+            parameters=[sim_time_param],
             output='screen'))
 
-    ld.add_action(Node(package='occlusion_sim', executable='multi_obstacle_controller.py', output='screen'))
-    ld.add_action(Node(package='occlusion_sim', executable='cbf_wrapper_node.py', output='screen'))
-    ld.add_action(Node(package='occlusion_sim', executable='sensor_visualizer_node.py', output='screen'))
-    ld.add_action(Node(package='rviz2', executable='rviz2', arguments=['-d', rviz_config], output='screen'))
+    ld.add_action(Node(package='occlusion_sim', executable='multi_obstacle_controller.py',
+                       parameters=[sim_time_param], output='screen'))
+    ld.add_action(Node(package='occlusion_sim', executable='cbf_wrapper_node.py',
+                       parameters=[sim_time_param], output='screen'))
+    ld.add_action(Node(package='occlusion_sim', executable='sensor_visualizer_node.py',
+                       parameters=[sim_time_param], output='screen'))
+    ld.add_action(Node(package='rviz2', executable='rviz2', arguments=['-d', rviz_config],
+                       parameters=[sim_time_param], output='screen'))
     return ld

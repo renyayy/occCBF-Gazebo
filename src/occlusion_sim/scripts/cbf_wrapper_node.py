@@ -26,7 +26,8 @@ class CBFWrapperNode(Node):
         super().__init__('cbf_wrapper_node')
 
         # 制御パラメータ
-        self.dt = 0.05
+        self.dt = 0.05  # タイマー周期 (初期値・フォールバック)
+        self.last_time = None  # sim time ベース dt 計算用
         self.goal = np.array([[20.0], [7.5], [0.0]])
         self.obstacle_radius = 0.3
 
@@ -96,6 +97,16 @@ class CBFWrapperNode(Node):
         """メイン制御ループ (dt周期で実行)"""
         if not self.odom_received:
             return
+
+        # sim time ベースで dt を動的計算
+        now = self.get_clock().now()
+        if self.last_time is not None:
+            dt_ns = (now - self.last_time).nanoseconds
+            dt = dt_ns * 1e-9
+            if dt > 0.0:
+                self.dt = dt
+                self.robot.dt = dt
+        self.last_time = now
 
         # ゴール到達判定
         dist = np.hypot(self.goal[0, 0] - self.X[0, 0], self.goal[1, 0] - self.X[1, 0])

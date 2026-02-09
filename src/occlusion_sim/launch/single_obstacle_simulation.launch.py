@@ -23,6 +23,8 @@ def generate_launch_description():
     with open(tmp_sdf, 'w') as f:
         f.write(sdf_content)
 
+    sim_time_param = {'use_sim_time': True}
+
     return LaunchDescription([
         # Gazebo server
         ExecuteProcess(
@@ -34,22 +36,29 @@ def generate_launch_description():
         Node(package='gazebo_ros', executable='spawn_entity.py',
              arguments=['-entity', 'ego_robot', '-file', urdf,
                         '-x', '1.0', '-y', '7.5', '-z', '0.2'],
+             parameters=[sim_time_param],
              output='screen'),
         # Single dynamic obstacle at center (10.5, 7.5)
         Node(package='gazebo_ros', executable='spawn_entity.py',
              arguments=['-entity', obs_name, '-file', tmp_sdf,
                         '-x', str(obs_x), '-y', str(obs_y), '-z', '0.1'],
+             parameters=[sim_time_param],
              output='screen'),
         # Obstacle controller (chase ego robot)
         Node(package='occlusion_sim', executable='single_obstacle_controller.py',
+             parameters=[sim_time_param],
              output='screen'),
         # CBF safe controller
         Node(package='occlusion_sim', executable='cbf_wrapper_node.py',
+             parameters=[sim_time_param],
              output='screen'),
         # Sensor visualizer
         Node(package='occlusion_sim', executable='sensor_visualizer_node.py',
+             parameters=[sim_time_param],
              output='screen'),
         # RViz2
         Node(package='rviz2', executable='rviz2',
-             arguments=['-d', rviz_config], output='screen'),
+             arguments=['-d', rviz_config],
+             parameters=[sim_time_param],
+             output='screen'),
     ])

@@ -32,7 +32,11 @@
 
     <physics name='default_physics' default='0' type='ode'>
       <gravity>0 0 -9.8</gravity>
+      <max_step_size>0.001</max_step_size>
+      <!-- real_time_update_rate × max_step_size = 目標リアルタイム係数
+           CBF計算負荷が高い場合は real_time_update_rate を下げる (例: 500→RT係数0.5) -->
       <real_time_update_rate>1000</real_time_update_rate>
+      <real_time_factor>1.0</real_time_factor>
     </physics>
   </world>
 </sdf>
