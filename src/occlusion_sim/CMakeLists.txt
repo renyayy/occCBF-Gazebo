@@ -31,9 +31,9 @@ install(
 )
 
 install(PROGRAMS
-  scripts/simulation_supervisor.py
   scripts/cbf_wrapper_node.py
   scripts/multi_obstacle_controller.py
+  scripts/single_obstacle_controller.py
   scripts/sensor_visualizer_node.py
   DESTINATION lib/${PROJECT_NAME}
 )

@@ -36,7 +36,7 @@ class CBFWrapperNode(Node):
             'a_max': 1.0,
             'radius': 0.25,
             'sensing_range': 10.0,
-            'backup_cbf': {'T_horizon': 3.0, 'dt_backup': 0.05, 'alpha': 2.0},
+            'backup_cbf': {'T_horizon': 2.0, 'dt_backup': 0.05, 'alpha': 1.0},
         }
 
         # ロボットモデル

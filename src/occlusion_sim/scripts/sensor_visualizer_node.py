@@ -35,7 +35,7 @@ class SensorVisualizerNode(Node):
             'a_max': 1.0,
             'radius': self.robot_radius,
             'sensing_range': self.sensing_range,
-            'backup_cbf': {'T_horizon': 3.0, 'dt_backup': 0.05, 'alpha': 2.0},
+            'backup_cbf': {'T_horizon': 2.0, 'dt_backup': 0.05, 'alpha': 1.0},
         }
 
         self.dt = 0.05
