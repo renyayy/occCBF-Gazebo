@@ -43,6 +43,11 @@ install(PROGRAMS
 )
 
 install(
+  DIRECTORY scripts/scenarios
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
   DIRECTORY safe_control
   DESTINATION lib
 )

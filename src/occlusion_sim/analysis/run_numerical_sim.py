@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run Python numerical simulation and export CBF debug data to CSV.
 
-Matches Gazebo multi_obstacle scenario for Phase 1 comparison.
+Supports scenario-based configuration for unified Python/Gazebo experiments.
 """
 import argparse
 import csv
@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
 import sim_config  # noqa: E402
 
+from scenarios import load_scenario, list_scenarios
 from dynamic_env.main import LocalTrackingControllerDyn
 from utils import plotting, env
 
@@ -27,17 +28,72 @@ from utils import plotting, env
 class DataCollectingController(LocalTrackingControllerDyn):
     """Subclass that logs per-step CBF debug data without modifying safe_control."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, scenario_obs_behaviors=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.data_log = []
         self._step_count = 0
+        # シナリオ固有の障害物behavior情報 (waypoint / chase 用)
+        self._scenario_obs_behaviors = scenario_obs_behaviors or []
 
     def control_step(self):
         pre_X = self.robot.X.copy()
         ret = super().control_step()
+        self._update_scenario_obs()
         self._log_step(pre_X)
         self._step_count += 1
         return ret
+
+    def _update_scenario_obs(self):
+        """waypoint / chase behavior の障害物速度を毎ステップ更新"""
+        for beh in self._scenario_obs_behaviors:
+            idx = beh['obs_index']
+            if idx >= len(self.obs):
+                continue
+
+            if beh['behavior'] == 'waypoint':
+                self._update_waypoint_obs(idx, beh)
+            elif beh['behavior'] == 'chase':
+                self._update_chase_obs(idx, beh)
+
+    def _update_waypoint_obs(self, idx, beh):
+        ox, oy = float(self.obs[idx, 0]), float(self.obs[idx, 1])
+        wps = beh['waypoints']
+        wp_idx = beh.get('_wp_idx', 0)
+        threshold = 0.2
+
+        tx, ty = wps[wp_idx]
+        dist = math.hypot(tx - ox, ty - oy)
+        if dist < threshold and wp_idx < len(wps) - 1:
+            wp_idx += 1
+            beh['_wp_idx'] = wp_idx
+            tx, ty = wps[wp_idx]
+            dist = math.hypot(tx - ox, ty - oy)
+
+        v_max = beh['v_max']
+        if dist < threshold and wp_idx == len(wps) - 1:
+            vx, vy = 0.0, 0.0
+        elif dist < 1e-6:
+            vx, vy = 0.0, 0.0
+        else:
+            vx = v_max * (tx - ox) / dist
+            vy = v_max * (ty - oy) / dist
+
+        self.obs[idx, 3] = vx
+        self.obs[idx, 4] = vy
+
+    def _update_chase_obs(self, idx, beh):
+        ox, oy = float(self.obs[idx, 0]), float(self.obs[idx, 1])
+        rx, ry = float(self.robot.X[0, 0]), float(self.robot.X[1, 0])
+        dx, dy = rx - ox, ry - oy
+        dist = math.hypot(dx, dy)
+        v_max = beh['v_max']
+        if dist < 1e-6:
+            vx, vy = 0.0, 0.0
+        else:
+            vx = v_max * dx / dist
+            vy = v_max * dy / dist
+        self.obs[idx, 3] = vx
+        self.obs[idx, 4] = vy
 
     def _log_step(self, pre_X):
         pc = self.pos_controller
@@ -89,42 +145,112 @@ CSV_HEADER = [
 ]
 
 
-def run_simulation(args):
+def build_from_scenario(scenario_name):
+    """シナリオconfigからシミュレーション用パラメータを構築"""
+    sc = load_scenario(scenario_name)
     dt = 0.05
 
+    robot_cfg = sc['robot']
     robot_spec = {
         'model': 'DoubleIntegrator2D',
-        'v_max': 1.0,
-        'a_max': 1.0,
-        'radius': 0.25,
-        'sensing_range': 10.0,
-        'backup_cbf': {'T_horizon': 2.0},
+        'v_max': robot_cfg['v_max'],
+        'a_max': robot_cfg['a_max'],
+        'radius': robot_cfg['radius'],
+        'sensing_range': robot_cfg['sensing_range'],
+        'backup_cbf': {'T_horizon': sc['cbf']['T_horizon']},
     }
 
-    waypoints = np.array([[1.0, 7.5, 0.0], [20.0, 7.5, 0.0]])
-    x_init = waypoints[0]
+    start = robot_cfg['start']
+    goal = robot_cfg['goal']
+    waypoints = np.array([[start[0], start[1], 0.0], [goal[0], goal[1], 0.0]])
 
-    # Obstacle setup matching Gazebo multi_obstacle scenario
-    # Use Python random (same as multi_obstacle_controller.py) for initial headings
-    obs_positions = [(8.0, 5.0), (10.0, 9.0), (12.0, 3.0), (14.0, 11.0), (16.0, 7.0)]
-    obs_radius = 0.3
-    v_max_obs = 0.5
-    y_min, y_max = 1.0, 14.0
+    env_cfg = sc['env']
+    env_width = env_cfg['x_max'] - env_cfg['x_min']
+    env_height = env_cfg['y_max'] - env_cfg['y_min']
 
-    random.seed(42)
+    seed = sc.get('seed', 42)
+    random.seed(seed)
+
     obs_data = []
     obs_meta = []
-    for x, y in obs_positions:
-        theta = random.uniform(-math.pi, math.pi)
-        vx = v_max_obs * math.cos(theta)
-        vy = v_max_obs * math.sin(theta)
-        obs_data.append([x, y, obs_radius, vx, vy, y_min, y_max, 1])
-        obs_meta.append({'mode': 1, 'v_max': v_max_obs, 'theta': theta})
+    scenario_obs_behaviors = []  # waypoint/chase の追加情報
+    obs_index = 0
 
-    known_obs = np.array(obs_data, dtype=float)
+    for obs_cfg in sc.get('obstacles', []):
+        x, y = obs_cfg['position']
+        r = obs_cfg['radius']
+        v_max = obs_cfg['v_max']
+        behavior = obs_cfg['behavior']
+        y_min = env_cfg['y_min']
+        y_max = env_cfg['y_max']
 
-    env_width, env_height = 24.0, 15.0
-    plot_handler = plotting.Plotting(width=env_width, height=env_height, known_obs=known_obs)
+        if behavior == 'random_walk':
+            theta = random.uniform(-math.pi, math.pi)
+            vx = v_max * math.cos(theta)
+            vy = v_max * math.sin(theta)
+            obs_data.append([x, y, r, vx, vy, y_min, y_max, 1])
+            obs_meta.append({'mode': 1, 'v_max': v_max, 'theta': theta})
+        elif behavior == 'waypoint':
+            # 初速度: 最初のWP→次のWP方向
+            wps = obs_cfg['waypoints']
+            if len(wps) >= 2:
+                dx, dy = wps[1][0] - wps[0][0], wps[1][1] - wps[0][1]
+                d = math.hypot(dx, dy)
+                vx = v_max * dx / d if d > 1e-6 else 0.0
+                vy = v_max * dy / d if d > 1e-6 else 0.0
+            else:
+                vx, vy = 0.0, 0.0
+            obs_data.append([x, y, r, vx, vy, y_min, y_max, 1])
+            obs_meta.append({'mode': 0, 'v_max': v_max, 'theta': math.atan2(vy, vx)})
+            scenario_obs_behaviors.append({
+                'obs_index': obs_index, 'behavior': 'waypoint',
+                'waypoints': wps, 'v_max': v_max, '_wp_idx': 0,
+            })
+        elif behavior == 'chase':
+            obs_data.append([x, y, r, 0.0, 0.0, y_min, y_max, 1])
+            obs_meta.append({'mode': 0, 'v_max': v_max, 'theta': 0.0})
+            scenario_obs_behaviors.append({
+                'obs_index': obs_index, 'behavior': 'chase', 'v_max': v_max,
+            })
+        else:  # static
+            obs_data.append([x, y, r, 0.0, 0.0, y_min, y_max, 0])
+            obs_meta.append({'mode': 0, 'v_max': 0.0, 'theta': 0.0})
+        obs_index += 1
+
+    # 壁の円近似 → 静的障害物として追加
+    for wall in sc.get('walls', []):
+        y_min = env_cfg['y_min']
+        y_max = env_cfg['y_max']
+        for cx, cy, cr in wall.get('circles', []):
+            obs_data.append([cx, cy, cr, 0.0, 0.0, y_min, y_max, 0])
+            obs_meta.append({'mode': 0, 'v_max': 0.0, 'theta': 0.0})
+
+    known_obs = np.array(obs_data, dtype=float) if obs_data else np.empty((0, 8))
+
+    return {
+        'dt': dt,
+        'robot_spec': robot_spec,
+        'waypoints': waypoints,
+        'known_obs': known_obs,
+        'obs_meta': obs_meta,
+        'scenario_obs_behaviors': scenario_obs_behaviors,
+        'env_width': env_width,
+        'env_height': env_height,
+        'seed': seed,
+    }
+
+
+def run_simulation(args):
+    params = build_from_scenario(args.scenario)
+    dt = params['dt']
+    robot_spec = params['robot_spec']
+    waypoints = params['waypoints']
+    known_obs = params['known_obs']
+    obs_meta = params['obs_meta']
+    x_init = waypoints[0]
+
+    plot_handler = plotting.Plotting(
+        width=params['env_width'], height=params['env_height'], known_obs=known_obs)
     ax, fig = plot_handler.plot_grid("")
     env_handler = env.Env()
 
@@ -136,7 +262,8 @@ def run_simulation(args):
         save_animation=False,
         ax=ax, fig=fig,
         env=env_handler,
-        rand_seed=42,
+        rand_seed=params['seed'],
+        scenario_obs_behaviors=params['scenario_obs_behaviors'],
     )
 
     controller.obs = known_obs
@@ -165,10 +292,12 @@ def run_simulation(args):
     # Save result
     duration = len(controller.data_log) * dt
     result = {'outcome': outcome, 'duration': round(duration, 2),
-              'total_steps': len(controller.data_log)}
+              'total_steps': len(controller.data_log),
+              'scenario': args.scenario}
     with open(os.path.join(args.output, 'result.json'), 'w') as f:
         json.dump(result, f, indent=2)
 
+    print(f'Scenario: {args.scenario}')
     print(f'Outcome: {outcome}')
     print(f'Duration: {duration:.2f}s ({len(controller.data_log)} steps)')
     print(f'CSV: {csv_path}')
@@ -179,6 +308,8 @@ def run_simulation(args):
 def main():
     parser = argparse.ArgumentParser(description='Run numerical simulation with data collection')
     parser.add_argument('--output', '-o', required=True, help='Output directory')
+    parser.add_argument('--scenario', '-s', default='multi_random',
+                        help=f'Scenario name (available: {list_scenarios()})')
     parser.add_argument('--tf', type=float, default=300.0, help='Simulation time limit (s)')
     args = parser.parse_args()
     run_simulation(args)
