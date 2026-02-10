@@ -166,6 +166,7 @@ def generate_launch_description():
         condition=IfCondition(is_unicycle)))
 
     # --- センサビジュアライザ ---
+    env_cfg = sc['env']
     ld.add_action(Node(
         package='occlusion_sim', executable='sensor_visualizer_node.py',
         parameters=[sim_time_param, {
@@ -173,6 +174,10 @@ def generate_launch_description():
             'start_y': robot_cfg['start'][1],
             'goal_x': robot_cfg['goal'][0],
             'goal_y': robot_cfg['goal'][1],
+            'env_x_min': env_cfg['x_min'],
+            'env_x_max': env_cfg['x_max'],
+            'env_y_min': env_cfg['y_min'],
+            'env_y_max': env_cfg['y_max'],
         }],
         output='screen'))
 

@@ -23,6 +23,10 @@ class SensorVisualizerNode(Node):
         self.declare_parameter('start_y', sim_config.DEFAULT_START[1])
         self.declare_parameter('goal_x', sim_config.DEFAULT_GOAL[0])
         self.declare_parameter('goal_y', sim_config.DEFAULT_GOAL[1])
+        self.declare_parameter('env_x_min', sim_config.ENV_X_MIN)
+        self.declare_parameter('env_x_max', sim_config.ENV_X_MAX)
+        self.declare_parameter('env_y_min', sim_config.ENV_Y_MIN)
+        self.declare_parameter('env_y_max', sim_config.ENV_Y_MAX)
 
         self.sensing_range = sim_config.SENSING_RANGE
         self.robot_radius = sim_config.ROBOT_RADIUS
@@ -55,10 +59,10 @@ class SensorVisualizerNode(Node):
         self.create_subscription(Odometry, '/obstacle/state', self.obs_cb, 10)
 
         # Movement boundaries
-        self.X_MIN = sim_config.ENV_X_MIN
-        self.X_MAX = sim_config.ENV_X_MAX
-        self.Y_MIN = sim_config.ENV_Y_MIN
-        self.Y_MAX = sim_config.ENV_Y_MAX
+        self.X_MIN = self.get_parameter('env_x_min').value
+        self.X_MAX = self.get_parameter('env_x_max').value
+        self.Y_MIN = self.get_parameter('env_y_min').value
+        self.Y_MAX = self.get_parameter('env_y_max').value
 
         # Publishers
         self.sensing_range_pub = self.create_publisher(Marker, '/sensor_viz/sensing_range', 10)
