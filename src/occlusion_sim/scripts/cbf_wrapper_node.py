@@ -6,6 +6,7 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Float64MultiArray, MultiArrayDimension
 import numpy as np
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -69,6 +70,7 @@ class CBFWrapperNode(Node):
         self.create_subscription(Odometry, '/odom', self.odom_cb, 10)
         self.create_subscription(Odometry, '/obstacle/state', self.obs_cb, 10)
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.debug_pub = self.create_publisher(Float64MultiArray, '/cbf_debug_info', 10)
         self.create_timer(self.dt, self.control_loop)
 
         self.get_logger().info('CBF Wrapper Node started')
@@ -159,6 +161,34 @@ class CBFWrapperNode(Node):
             f' | Constraints: {n_constraints}',
             throttle_duration_sec=0.1
         )
+
+        # CBFデバッグ情報をパブリッシュ
+        # h(x) = ||p_rel||^2 - d_min^2 (backup_cbf_qp.py:232 と同一)
+        R_robot = self.robot_spec['radius']
+        h_min = float('inf')
+        for obs in visible_obs_np:
+            p_rel = np.array([self.X[0, 0] - obs[0], self.X[1, 0] - obs[1]])
+            d_min = obs[2] + R_robot
+            h_min = min(h_min, float(p_rel @ p_rel - d_min**2))
+
+        debug_msg = Float64MultiArray()
+        debug_msg.layout.dim = [MultiArrayDimension(label='cbf_debug', size=17, stride=17)]
+        debug_msg.data = [
+            float(now.nanoseconds) * 1e-9,            # 0: stamp_sec
+            h_min,                                      # 1: h_min
+            min_dist,                                   # 2: min_dist
+            float(n_constraints if n_constraints != '-' else 0),  # 3: num_constraints
+            float(getattr(self.controller, 'last_qp_solve_time_ms', 0.0) or 0.0),  # 4: qp_solve_time_ms
+            1.0 if intervention == 'backup_qp' else 0.0,  # 5: intervention
+            float(u[0, 0]), float(u[1, 0]),             # 6-7: u_x, u_y
+            float(u_ref[0, 0]), float(u_ref[1, 0]),     # 8-9: u_ref_x, u_ref_y
+            float(self.X[0, 0]), float(self.X[1, 0]),   # 10-11: robot_x, robot_y
+            float(self.X[2, 0]), float(self.X[3, 0]),   # 12-13: robot_vx, robot_vy
+            1.0 if status == 'optimal' else 0.0,        # 14: status_ok
+            float(visible_count),                        # 15: num_visible_obs
+            float(total_obs),                            # 16: num_total_obs
+        ]
+        self.debug_pub.publish(debug_msg)
 
         # 加速度 → 速度
         vx = self.X[2, 0] + float(u[0, 0]) * self.dt

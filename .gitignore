@@ -1,6 +1,7 @@
 install/
 build/
 log/
+experiment_bags/
 .docs/
 .venv/
 CLAUDE.md
