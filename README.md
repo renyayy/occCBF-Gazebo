@@ -50,35 +50,71 @@ self.controller = CBFQP(...)              # 基本CBF-QP
 
 ## Experiment (データ収集 + 解析)
 
-### 1. 実験実行（シミュレーション + bag自動記録）
+出力先ディレクトリ規約: `experiments/<platform>_<model>/<experiment_id>/`
+
+| platform | model | 説明 |
+|----------|-------|------|
+| `python` | `di` | Python数値シミュレーション / Double Integrator |
+| `gazebo` | `di` | Gazebo物理シミュレーション / Double Integrator |
+| `gazebo` | `unicycle` | Gazebo / TurtleBot3 Unicycle |
+| `real` | `unicycle` | 実機 / TurtleBot3 |
+
+### 1a. Gazebo実験（シミュレーション + bag自動記録）
 ```bash
-# multi obstacle シナリオ（デフォルト）
+# multi obstacle シナリオ（デフォルト → experiments/gazebo_di/<id>/ に保存）
 ros2 launch occlusion_sim experiment.launch.py experiment_id:=test_001
 
 # single obstacle シナリオ
 ros2 launch occlusion_sim experiment.launch.py experiment_id:=test_001 scenario:=single
 ```
 
-bag は `experiment_bags/<experiment_id>/` に保存される。
+### 1b. Python数値シミュレーション
+```bash
+python3 src/occlusion_sim/analysis/run_numerical_sim.py -o experiments/python_di/test_001
+
+# シミュレーション時間を指定
+python3 src/occlusion_sim/analysis/run_numerical_sim.py -o experiments/python_di/test_001 --tf 120
+```
+
+CSV + `result.json`（outcome/duration）が出力される。
 
 ### 2. 解析（プロット生成）
 ```bash
-python3 src/occlusion_sim/analysis/plot_experiment.py experiment_bags/<experiment_id>
+# Gazebo bag
+python3 src/occlusion_sim/analysis/plot_experiment.py experiments/gazebo_di/test_001
 
-# 出力先を指定する場合
-python3 src/occlusion_sim/analysis/plot_experiment.py experiment_bags/<experiment_id> --output <output_dir>
+# Python sim CSV
+python3 src/occlusion_sim/analysis/plot_experiment.py experiments/python_di/test_001/cbf_debug.csv
+
+# 出力先を指定
+python3 src/occlusion_sim/analysis/plot_experiment.py <bag or csv> --output <output_dir>
 ```
 
-デフォルトではbagディレクトリ内に以下のPNGが生成される:
+rosbag/CSV を自動判定。結果判定（goal_reached / collision / timeout）付き。
 
 | ファイル | 内容 |
 |---------|------|
 | `h_trajectory.png` | CBF安全性関数 h(x) の時系列 |
 | `min_distance.png` | 障害物との最小距離の時系列 |
 | `tracking_error.png` | 制御追従誤差 \|\|u - u_ref\|\| |
-| `summary.png` | 上記3つ + ロボット軌跡の統合プロット |
 
-### 3. 記録トピック
+### 3. 比較（Python sim vs Gazebo）
+```bash
+python3 src/occlusion_sim/analysis/compare_experiments.py \
+  experiments/python_di/test_001/cbf_debug.csv \
+  experiments/gazebo_di/test_001 \
+  --labels "Python Sim" "Gazebo" \
+  --output experiments/comparison/di_test_001
+```
+
+| ファイル | 内容 |
+|---------|------|
+| `h_comparison.png` | h(x) 重ね描画 |
+| `distance_comparison.png` | 最小距離 重ね描画 |
+| `tracking_error_comparison.png` | 制御追従誤差 重ね描画 |
+| `trajectory_comparison.png` | XY軌跡 重ね描画 |
+
+### 4. 記録トピック（Gazebo bag）
 
 | トピック | 型 | 内容 |
 |---------|---|------|
@@ -88,7 +124,7 @@ python3 src/occlusion_sim/analysis/plot_experiment.py experiment_bags/<experimen
 | `/cbf_debug_info` | Float64MultiArray | CBF内部値（下表参照） |
 | `/tf` | TFMessage | 座標変換 |
 
-#### `/cbf_debug_info` フィールドレイアウト
+#### `/cbf_debug_info` フィールドレイアウト（Gazebo bag / Python CSV 共通）
 
 | Index | フィールド | 内容 |
 |-------|-----------|------|

@@ -1,8 +1,9 @@
 install/
 build/
 log/
-experiment_bags/
+experiments/
 .docs/
 .venv/
+__pycache__/
 CLAUDE.md
 *.log

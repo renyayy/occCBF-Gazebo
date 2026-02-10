@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Experiment analysis: read rosbag2 and generate evaluation plots.
+"""Experiment analysis: read rosbag2 or CSV and generate evaluation plots.
 
-/cbf_debug_info (Float64MultiArray) field layout:
+/cbf_debug_info field layout (17 fields):
   0: stamp_sec        タイムスタンプ(秒)
   1: h_min            最小CBF値 h(x)
   2: min_dist         最近傍障害物距離
@@ -27,10 +27,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-import rosbag2_py
-from rclpy.serialization import deserialize_message
-from std_msgs.msg import Float64MultiArray
-
 # Field indices
 STAMP = 0; H_MIN = 1; MIN_DIST = 2; N_CONSTRAINTS = 3
 QP_TIME_MS = 4; INTERVENTION = 5; U_X = 6; U_Y = 7
@@ -39,9 +35,40 @@ ROBOT_VX = 12; ROBOT_VY = 13; STATUS_OK = 14
 N_VISIBLE = 15; N_TOTAL = 16
 
 COLLISION_DIST = 0.25 + 0.3  # robot_radius + obstacle_radius
+GOAL_THRESHOLD = 0.3
 
 
-def read_cbf_debug(bag_path):
+def load_experiment_data(path):
+    """Load experiment data from rosbag2 directory or CSV file.
+
+    Returns numpy array of shape (N, 17) or None.
+    """
+    if os.path.isfile(path) and path.endswith('.csv'):
+        return _read_csv(path)
+    if os.path.isdir(path) and os.path.exists(os.path.join(path, 'metadata.yaml')):
+        return _read_rosbag(path)
+    # Try as rosbag directory anyway
+    if os.path.isdir(path):
+        return _read_rosbag(path)
+    print(f'Cannot determine input type for: {path}')
+    return None
+
+
+def _read_csv(csv_path):
+    data = np.loadtxt(csv_path, delimiter=',', skiprows=1)
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+    if data.shape[0] == 0:
+        print('No data in CSV.')
+        return None
+    return data
+
+
+def _read_rosbag(bag_path):
+    import rosbag2_py
+    from rclpy.serialization import deserialize_message
+    from std_msgs.msg import Float64MultiArray
+
     reader = rosbag2_py.SequentialReader()
     storage_options = rosbag2_py.StorageOptions(uri=bag_path, storage_id='sqlite3')
     converter_options = rosbag2_py.ConverterOptions(
@@ -61,6 +88,22 @@ def read_cbf_debug(bag_path):
         print('No /cbf_debug_info messages found in bag.')
         return None
     return np.array(records)
+
+
+def detect_outcome(data, goal):
+    """Detect experiment outcome from data."""
+    final_pos = data[-1, [ROBOT_X, ROBOT_Y]]
+    dist_to_goal = np.linalg.norm(final_pos - goal)
+    if dist_to_goal < GOAL_THRESHOLD:
+        # Find when goal was first reached
+        dists = np.linalg.norm(data[:, [ROBOT_X, ROBOT_Y]] - goal, axis=1)
+        idx = np.argmax(dists < GOAL_THRESHOLD)
+        return 'goal_reached', idx
+    finite_dist = data[:, MIN_DIST][np.isfinite(data[:, MIN_DIST])]
+    if len(finite_dist) > 0 and np.min(finite_dist) < COLLISION_DIST:
+        idx = np.argmin(data[:, MIN_DIST])
+        return 'collision', idx
+    return 'timeout', len(data) - 1
 
 
 def plot_h_trajectory(t, h, output_dir):
@@ -107,58 +150,7 @@ def plot_tracking_error(t, u_err, interventions, output_dir):
     plt.close(fig)
 
 
-def plot_summary(t, data, output_dir):
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-
-    # h(x)
-    ax = axes[0, 0]
-    ax.plot(t, data[:, H_MIN], 'b-', linewidth=0.8)
-    ax.axhline(0, color='r', linestyle='--', linewidth=1)
-    ax.fill_between(t, data[:, H_MIN], 0, where=(data[:, H_MIN] < 0), color='red', alpha=0.3)
-    ax.set_xlabel('Time [s]')
-    ax.set_ylabel('h_min(x)')
-    ax.set_title('CBF Safety Function')
-    ax.grid(True, alpha=0.3)
-
-    # min distance
-    ax = axes[0, 1]
-    dist = data[:, MIN_DIST]
-    finite_mask = np.isfinite(dist)
-    ax.plot(t[finite_mask], dist[finite_mask], 'b-', linewidth=0.8)
-    ax.axhline(COLLISION_DIST, color='r', linestyle='--', linewidth=1)
-    ax.set_xlabel('Time [s]')
-    ax.set_ylabel('Min Distance [m]')
-    ax.set_title('Minimum Distance')
-    ax.grid(True, alpha=0.3)
-
-    # tracking error
-    ax = axes[1, 0]
-    u_err = np.hypot(data[:, U_X] - data[:, U_REF_X], data[:, U_Y] - data[:, U_REF_Y])
-    ax.plot(t, u_err, 'b-', linewidth=0.8)
-    ax.set_xlabel('Time [s]')
-    ax.set_ylabel('||u - u_ref||')
-    ax.set_title('Control Tracking Error')
-    ax.grid(True, alpha=0.3)
-
-    # trajectory
-    ax = axes[1, 1]
-    ax.plot(data[:, ROBOT_X], data[:, ROBOT_Y], 'b-', linewidth=1, label='trajectory')
-    ax.plot(data[0, ROBOT_X], data[0, ROBOT_Y], 'go', markersize=8, label='start')
-    ax.plot(data[-1, ROBOT_X], data[-1, ROBOT_Y], 'r*', markersize=10, label='end')
-    ax.set_xlabel('X [m]')
-    ax.set_ylabel('Y [m]')
-    ax.set_title('Robot Trajectory')
-    ax.set_aspect('equal')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    fig.suptitle('Experiment Summary', fontsize=14)
-    fig.tight_layout()
-    fig.savefig(os.path.join(output_dir, 'summary.png'), dpi=150)
-    plt.close(fig)
-
-
-def print_stats(t, data):
+def print_stats(t, data, outcome, outcome_idx):
     h = data[:, H_MIN]
     dist = data[:, MIN_DIST]
     qp_time = data[:, QP_TIME_MS]
@@ -171,6 +163,7 @@ def print_stats(t, data):
     intervention_rate = np.mean(interventions > 0.5) * 100
 
     print(f'=== Experiment Statistics ===')
+    print(f'Outcome:            {outcome} (at t={t[outcome_idx]:.2f}s)')
     print(f'Duration:           {duration:.2f} s  ({len(data)} samples)')
     print(f'h_min global min:   {np.min(h):.6f}  (at t={t[np.argmin(h)]:.2f}s)')
     print(f'Safety violations:  {violations} / {len(h)}  ({violations/len(h)*100:.1f}%)')
@@ -181,28 +174,34 @@ def print_stats(t, data):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Analyze experiment rosbag')
-    parser.add_argument('bag_path', help='Path to rosbag2 directory')
+    parser = argparse.ArgumentParser(description='Analyze experiment data (rosbag or CSV)')
+    parser.add_argument('data_path', help='Path to rosbag2 directory or CSV file')
     parser.add_argument('--output', '-o', default=None, help='Output directory for plots')
+    parser.add_argument('--goal', nargs=2, type=float, default=[20.0, 7.5],
+                        metavar=('X', 'Y'), help='Goal position (default: 20.0 7.5)')
     args = parser.parse_args()
 
-    output_dir = args.output or args.bag_path
+    output_dir = args.output or (os.path.dirname(args.data_path)
+                                  if os.path.isfile(args.data_path)
+                                  else args.data_path)
     os.makedirs(output_dir, exist_ok=True)
 
-    data = read_cbf_debug(args.bag_path)
+    data = load_experiment_data(args.data_path)
     if data is None:
         return
 
     t = data[:, STAMP]
-    t = t - t[0]  # 0起点に正規化
+    t = t - t[0]
 
-    print_stats(t, data)
+    goal = np.array(args.goal)
+    outcome, outcome_idx = detect_outcome(data, goal)
+
+    print_stats(t, data, outcome, outcome_idx)
     plot_h_trajectory(t, data[:, H_MIN], output_dir)
     plot_min_distance(t, data[:, MIN_DIST], output_dir)
 
     u_err = np.hypot(data[:, U_X] - data[:, U_REF_X], data[:, U_Y] - data[:, U_REF_Y])
     plot_tracking_error(t, u_err, data[:, INTERVENTION], output_dir)
-    plot_summary(t, data, output_dir)
 
     print(f'\nPlots saved to: {output_dir}/')
 

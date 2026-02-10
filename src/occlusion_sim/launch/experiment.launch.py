@@ -17,7 +17,7 @@ def generate_launch_description():
 
     experiment_id_arg = DeclareLaunchArgument('experiment_id', default_value=timestamp)
     bag_dir_arg = DeclareLaunchArgument('bag_output_dir',
-                                        default_value='/root/Gazebo_ws/experiment_bags')
+                                        default_value='/root/Gazebo_ws/experiments/gazebo_di')
     scenario_arg = DeclareLaunchArgument('scenario', default_value='multi')
 
     experiment_id = LaunchConfiguration('experiment_id')
