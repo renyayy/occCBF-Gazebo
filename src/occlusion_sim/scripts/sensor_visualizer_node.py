@@ -10,6 +10,8 @@ from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
 import numpy as np
 
+import sim_config
+
 # safe_control パスを追加
 current_dir = os.path.dirname(os.path.abspath(__file__))
 safe_control_path = os.path.join(current_dir, '..', 'safe_control')
@@ -23,35 +25,31 @@ class SensorVisualizerNode(Node):
     def __init__(self):
         super().__init__('sensor_visualizer_node')
 
-        # Parameters (safe_control/dynamic_env準拠)
-        self.sensing_range = 10.0
-        self.robot_radius = 0.25
-        self.obstacle_radius = 0.3
+        # ROS パラメータ
+        self.declare_parameter('start_x', sim_config.DEFAULT_START[0])
+        self.declare_parameter('start_y', sim_config.DEFAULT_START[1])
+        self.declare_parameter('goal_x', sim_config.DEFAULT_GOAL[0])
+        self.declare_parameter('goal_y', sim_config.DEFAULT_GOAL[1])
 
-        # ロボット仕様（cbf_wrapper_nodeと一致）
-        self.robot_spec = {
-            'model': 'DoubleIntegrator2D',
-            'v_max': 1.0,
-            'a_max': 1.0,
-            'radius': self.robot_radius,
-            'sensing_range': self.sensing_range,
-            'backup_cbf': {'T_horizon': 2.0, 'dt_backup': 0.05, 'alpha': 1.0},
-        }
+        self.sensing_range = sim_config.SENSING_RANGE
+        self.robot_radius = sim_config.ROBOT_RADIUS
+        self.obstacle_radius = sim_config.OBSTACLE_RADIUS
 
-        self.dt = 0.05
-        self.robot = DoubleIntegrator2D(self.dt, self.robot_spec)
+        self.robot_spec = sim_config.make_robot_spec()
+        self.robot = DoubleIntegrator2D(sim_config.DT, self.robot_spec)
 
-        # オクルージョン管理（cbf_wrapper_nodeと同じ）
         self.occlusion_manager = OcclusionUtils(
             robot=self.robot,
             robot_spec=self.robot_spec,
-            sensing_range=self.robot_spec['sensing_range'],
+            sensing_range=self.sensing_range,
             barrier_fn=None
         )
 
         # Start/Goal positions
-        self.start_pos = (1.0, 7.5)
-        self.goal_pos = (20.0, 7.5)
+        self.start_pos = (self.get_parameter('start_x').value,
+                          self.get_parameter('start_y').value)
+        self.goal_pos = (self.get_parameter('goal_x').value,
+                         self.get_parameter('goal_y').value)
 
         # State
         self.robot_x = 0.0
@@ -63,9 +61,11 @@ class SensorVisualizerNode(Node):
         self.create_subscription(Odometry, '/odom', self.odom_cb, 10)
         self.create_subscription(Odometry, '/obstacle/state', self.obs_cb, 10)
 
-        # Movement boundaries (from multi_obstacle_controller.py)
-        self.X_MIN, self.X_MAX = 0.0, 24.0
-        self.Y_MIN, self.Y_MAX = 1.0, 14.0
+        # Movement boundaries
+        self.X_MIN = sim_config.ENV_X_MIN
+        self.X_MAX = sim_config.ENV_X_MAX
+        self.Y_MIN = sim_config.ENV_Y_MIN
+        self.Y_MAX = sim_config.ENV_Y_MAX
 
         # Publishers
         self.sensing_range_pub = self.create_publisher(Marker, '/sensor_viz/sensing_range', 10)
@@ -78,7 +78,7 @@ class SensorVisualizerNode(Node):
         self.ego_robot_pub = self.create_publisher(Marker, '/sensor_viz/ego_robot', 10)
 
         # Timer (20Hz)
-        self.create_timer(0.05, self.publish_markers)
+        self.create_timer(sim_config.DT, self.publish_markers)
 
         self.get_logger().info('Sensor Visualizer Node started')
 

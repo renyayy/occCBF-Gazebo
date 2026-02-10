@@ -4,6 +4,7 @@ log/
 experiments/
 .docs/
 .venv/
+__pycache__/
 CLAUDE.md
 *.log
 __pycache__/

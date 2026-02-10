@@ -6,7 +6,11 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Float64MultiArray, MultiArrayDimension
+import math
 import numpy as np
+
+import sim_config
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 safe_control_path = os.path.join(current_dir, '..', 'safe_control')
@@ -25,20 +29,27 @@ class CBFWrapperNode(Node):
     def __init__(self):
         super().__init__('cbf_wrapper_node')
 
-        # 制御パラメータ
-        self.dt = 0.05  # タイマー周期 (初期値・フォールバック)
-        self.last_time = None  # sim time ベース dt 計算用
-        self.goal = np.array([[20.0], [7.5], [0.0]])
-        self.obstacle_radius = 0.3
+        # ROS パラメータ
+        self.declare_parameter('v_max', sim_config.ROBOT_V_MAX)
+        self.declare_parameter('a_max', sim_config.ROBOT_A_MAX)
+        self.declare_parameter('goal_x', sim_config.DEFAULT_GOAL[0])
+        self.declare_parameter('goal_y', sim_config.DEFAULT_GOAL[1])
+        self.declare_parameter('body_frame_odom', False)
 
-        self.robot_spec = {
-            'model': 'DoubleIntegrator2D',
-            'v_max': 1.0,
-            'a_max': 1.0,
-            'radius': 0.25,
-            'sensing_range': 10.0,
-            'backup_cbf': {'T_horizon': 2.0, 'dt_backup': 0.05, 'alpha': 1.0},
-        }
+        # 制御パラメータ
+        self.dt = sim_config.DT
+        self.last_time = None
+        self.goal = np.array([
+            [self.get_parameter('goal_x').value],
+            [self.get_parameter('goal_y').value],
+            [0.0]
+        ])
+        self.body_frame_odom = self.get_parameter('body_frame_odom').value
+        self.obstacle_radius = sim_config.OBSTACLE_RADIUS
+
+        v_max = self.get_parameter('v_max').value
+        a_max = self.get_parameter('a_max').value
+        self.robot_spec = sim_config.make_robot_spec(v_max, a_max)
 
         # ロボットモデル
         self.robot = DoubleIntegrator2D(self.dt, self.robot_spec)
@@ -69,6 +80,7 @@ class CBFWrapperNode(Node):
         self.create_subscription(Odometry, '/odom', self.odom_cb, 10)
         self.create_subscription(Odometry, '/obstacle/state', self.obs_cb, 10)
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.debug_pub = self.create_publisher(Float64MultiArray, '/cbf_debug_info', 10)
         self.create_timer(self.dt, self.control_loop)
 
         self.get_logger().info('CBF Wrapper Node started')
@@ -77,8 +89,18 @@ class CBFWrapperNode(Node):
         """エゴロボットの状態 (位置・速度) を更新"""
         self.X[0, 0] = msg.pose.pose.position.x
         self.X[1, 0] = msg.pose.pose.position.y
-        self.X[2, 0] = msg.twist.twist.linear.x
-        self.X[3, 0] = msg.twist.twist.linear.y
+
+        if self.body_frame_odom:
+            # Unicycle: body frame → world frame 変換
+            q = msg.pose.pose.orientation
+            yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y),
+                             1.0 - 2.0 * (q.y * q.y + q.z * q.z))
+            v_body = msg.twist.twist.linear.x
+            self.X[2, 0] = v_body * math.cos(yaw)
+            self.X[3, 0] = v_body * math.sin(yaw)
+        else:
+            self.X[2, 0] = msg.twist.twist.linear.x
+            self.X[3, 0] = msg.twist.twist.linear.y
         self.odom_received = True
 
     def obs_cb(self, msg):
@@ -110,7 +132,7 @@ class CBFWrapperNode(Node):
 
         # ゴール到達判定
         dist = np.hypot(self.goal[0, 0] - self.X[0, 0], self.goal[1, 0] - self.X[1, 0])
-        if dist < 0.3:
+        if dist < sim_config.GOAL_THRESHOLD:
             if not self.goal_reached:
                 self.get_logger().info(f'Goal reached! (distance: {dist:.3f}m)')
                 self.goal_reached = True
@@ -159,6 +181,34 @@ class CBFWrapperNode(Node):
             f' | Constraints: {n_constraints}',
             throttle_duration_sec=0.1
         )
+
+        # CBFデバッグ情報をパブリッシュ
+        # h(x) = ||p_rel||^2 - d_min^2 (backup_cbf_qp.py:232 と同一)
+        R_robot = self.robot_spec['radius']
+        h_min = float('inf')
+        for obs in visible_obs_np:
+            p_rel = np.array([self.X[0, 0] - obs[0], self.X[1, 0] - obs[1]])
+            d_min = obs[2] + R_robot
+            h_min = min(h_min, float(p_rel @ p_rel - d_min**2))
+
+        debug_msg = Float64MultiArray()
+        debug_msg.layout.dim = [MultiArrayDimension(label='cbf_debug', size=17, stride=17)]
+        debug_msg.data = [
+            float(now.nanoseconds) * 1e-9,            # 0: stamp_sec
+            h_min,                                      # 1: h_min
+            min_dist,                                   # 2: min_dist
+            float(n_constraints if n_constraints != '-' else 0),  # 3: num_constraints
+            float(getattr(self.controller, 'last_qp_solve_time_ms', 0.0) or 0.0),  # 4: qp_solve_time_ms
+            1.0 if intervention == 'backup_qp' else 0.0,  # 5: intervention
+            float(u[0, 0]), float(u[1, 0]),             # 6-7: u_x, u_y
+            float(u_ref[0, 0]), float(u_ref[1, 0]),     # 8-9: u_ref_x, u_ref_y
+            float(self.X[0, 0]), float(self.X[1, 0]),   # 10-11: robot_x, robot_y
+            float(self.X[2, 0]), float(self.X[3, 0]),   # 12-13: robot_vx, robot_vy
+            1.0 if status == 'optimal' else 0.0,        # 14: status_ok
+            float(visible_count),                        # 15: num_visible_obs
+            float(total_obs),                            # 16: num_total_obs
+        ]
+        self.debug_pub.publish(debug_msg)
 
         # 加速度 → 速度
         vx = self.X[2, 0] + float(u[0, 0]) * self.dt

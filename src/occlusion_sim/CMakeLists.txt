@@ -31,10 +31,14 @@ install(
 )
 
 install(PROGRAMS
+  scripts/sim_config.py
+  scripts/obstacle_controller_base.py
   scripts/cbf_wrapper_node.py
   scripts/multi_obstacle_controller.py
   scripts/single_obstacle_controller.py
   scripts/sensor_visualizer_node.py
+  scripts/cmd_vel_converter.py
+  scripts/scenario_obstacle_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
