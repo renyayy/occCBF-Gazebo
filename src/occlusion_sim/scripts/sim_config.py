@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 """Shared simulation parameters for occlusion_sim."""
+import os as _os, sys as _sys
+
+_safe_control = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', 'safe_control')
+_safe_control = _os.path.abspath(_safe_control)
+if _safe_control not in _sys.path:
+    _sys.path.insert(0, _safe_control)
 
 # --- Environment ---
 ENV_X_MIN, ENV_X_MAX = 0.0, 24.0

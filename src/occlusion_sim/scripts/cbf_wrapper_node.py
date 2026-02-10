@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
 """CBF Wrapper Node"""
-import os
-import sys
+import math
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float64MultiArray, MultiArrayDimension
-import math
-import numpy as np
 
-import sim_config
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-safe_control_path = os.path.join(current_dir, '..', 'safe_control')
-sys.path.append(safe_control_path)
+import sim_config  # safe_control パスも設定される
 
 from robots.double_integrator2D import DoubleIntegrator2D
 from position_control.cbf_qp import CBFQP

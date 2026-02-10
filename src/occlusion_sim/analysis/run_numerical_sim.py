@@ -16,10 +16,9 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-# Add safe_control to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-safe_control_path = os.path.join(script_dir, '..', 'safe_control')
-sys.path.insert(0, safe_control_path)
+# sim_config 経由で safe_control パスを設定
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
+import sim_config  # noqa: E402
 
 from dynamic_env.main import LocalTrackingControllerDyn
 from utils import plotting, env

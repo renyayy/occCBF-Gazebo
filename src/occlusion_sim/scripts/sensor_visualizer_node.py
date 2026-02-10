@@ -1,21 +1,14 @@
 #!/usr/bin/env python3
 """Sensor Visualizer Node for RViz2"""
-import os
-import sys
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point
 from std_msgs.msg import ColorRGBA
-import numpy as np
 
-import sim_config
-
-# safe_control パスを追加
-current_dir = os.path.dirname(os.path.abspath(__file__))
-safe_control_path = os.path.join(current_dir, '..', 'safe_control')
-sys.path.append(safe_control_path)
+import sim_config  # safe_control パスも設定される
 
 from robots.double_integrator2D import DoubleIntegrator2D
 from utils.occlusion import OcclusionUtils
