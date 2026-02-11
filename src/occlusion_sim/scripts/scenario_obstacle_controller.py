@@ -3,7 +3,6 @@
 
 behavior types: waypoint, chase, random_walk, static
 """
-import sys
 import rclpy
 import math
 import random
@@ -13,23 +12,17 @@ from obstacle_controller_base import ObstacleControllerBase
 from scenarios import load_scenario
 
 
-def _parse_scenario_name():
-    """ROS引数からscenario_nameを取得 (ノード初期化前に呼ぶ)"""
-    args = sys.argv
-    for i, arg in enumerate(args):
-        if arg.startswith('scenario_name:='):
-            return arg.split(':=', 1)[1]
-        if arg == '-p' and i + 1 < len(args) and args[i + 1].startswith('scenario_name:='):
-            return args[i + 1].split(':=', 1)[1]
-    return 'multi_random'
-
-
 class ScenarioObstacleController(ObstacleControllerBase):
     def __init__(self):
-        sc = load_scenario(_parse_scenario_name())
+        super().__init__('scenario_obstacle_controller')
+
+        self.declare_parameter('scenario_name', 'multi_random')
+        scenario_name = self.get_parameter('scenario_name').value
+
+        sc = load_scenario(scenario_name)
         obs_configs = sc.get('obstacles', [])
         obs_names = [o['name'] for o in obs_configs]
-        super().__init__('scenario_obstacle_controller', obs_names)
+        self._setup_obs(obs_names)
 
         env_cfg = sc['env']
         random.seed(sc.get('seed', 42))
@@ -48,6 +41,7 @@ class ScenarioObstacleController(ObstacleControllerBase):
                 beh['waypoints'] = obs_cfg['waypoints']
                 beh['wp_idx'] = 0
                 beh['threshold'] = 0.2
+                beh['stopped'] = False
             elif behavior == 'chase':
                 needs_ego_odom = True
             elif behavior == 'random_walk':
@@ -79,7 +73,7 @@ class ScenarioObstacleController(ObstacleControllerBase):
             behavior = beh['behavior']
 
             if behavior == 'waypoint':
-                vx, vy = self._waypoint_control(ox, oy, beh)
+                vx, vy = self._waypoint_control(name, ox, oy, beh)
             elif behavior == 'chase':
                 vx, vy = self._chase_control(ox, oy, beh)
             elif behavior == 'random_walk':
@@ -90,7 +84,10 @@ class ScenarioObstacleController(ObstacleControllerBase):
             self.publish_cmd(name, vx, vy)
             self.publish_state(name, state.pose.pose, vx, vy)
 
-    def _waypoint_control(self, ox, oy, beh):
+    def _waypoint_control(self, name, ox, oy, beh):
+        if beh['stopped']:
+            return 0.0, 0.0
+
         wps = beh['waypoints']
         wp_idx = beh['wp_idx']
         v_max = beh['v_max']
@@ -105,6 +102,8 @@ class ScenarioObstacleController(ObstacleControllerBase):
             dist = math.hypot(tx - ox, ty - oy)
 
         if dist < beh['threshold'] and wp_idx == len(wps) - 1:
+            beh['stopped'] = True
+            self.get_logger().info(f'{name}: reached final waypoint, stopped')
             return 0.0, 0.0
         if dist < 1e-6:
             return 0.0, 0.0

@@ -22,11 +22,19 @@ SCENARIO = {
     'obstacles': [
         {
             'name': 'obs_0',
-            'position': (3.0, 2.0),
+            'position': (3.0, 3.7),
             'radius': 0.15,
             'v_max': 0.3,
             'behavior': 'waypoint',
-            'waypoints': [(3.0, 2.0), (3.0, 1.25), (1.5, 1.25)],
+            'waypoints': [
+                (3.0, 3.7),    # Behind wall (above wall y<3.5)
+                (2.3, 2.5),    # Down along wall left edge
+                (2.3, 1.3),    # Emerge below wall (pop-out!)
+                (2.0, 1.0),    # Cross ego nominal path
+                (1.5, 0.8),    # Arc below nominal path
+                (1.0, 0.9),    # Rising back
+                (0.5, 1.0),    # Ego start position (stop)
+            ],
         },
     ],
     'walls': [
