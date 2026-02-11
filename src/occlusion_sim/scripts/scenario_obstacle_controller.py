@@ -56,6 +56,7 @@ class ScenarioObstacleController(ObstacleControllerBase):
         if needs_ego_odom:
             self.create_subscription(Odometry, '/odom', self._ego_odom_cb, 10)
 
+        self._all_obs_ready = False
         self.get_logger().info(f'Scenario Controller: {len(obs_names)} obstacles')
 
     def _ego_odom_cb(self, msg):
@@ -63,6 +64,22 @@ class ScenarioObstacleController(ObstacleControllerBase):
         self._ego_y = msg.pose.pose.position.y
 
     def control_loop(self):
+        # 全障害物のスポーン完了を待機
+        if not self._all_obs_ready:
+            ready = sum(1 for s in self.obs_states.values() if s is not None)
+            if ready < len(self.obs_states):
+                self.get_logger().info(
+                    f'Waiting for spawns: {ready}/{len(self.obs_states)}',
+                    throttle_duration_sec=1.0)
+                # スポーン待ちでも state は発行 (cbf_wrapper_node の待機解除用)
+                for name in self.obs_states:
+                    state = self.obs_states[name]
+                    if state is not None:
+                        self.publish_state(name, state.pose.pose, 0.0, 0.0)
+                return
+            self._all_obs_ready = True
+            self.get_logger().info('All obstacles spawned, starting control')
+
         for name, beh in self._obs_behaviors.items():
             state = self.obs_states.get(name)
             if state is None:

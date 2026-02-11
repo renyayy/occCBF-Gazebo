@@ -55,6 +55,8 @@ class CBFWrapperNode(Node):
             o['name']: (0 if o.get('behavior') == 'static' else 1)
             for o in sc.get('obstacles', [])
         }
+        self._expected_obs_count = len(sc.get('obstacles', []))
+        self._all_obs_ready = False
 
         v_max = self.get_parameter('v_max').value
         a_max = self.get_parameter('a_max').value
@@ -146,6 +148,16 @@ class CBFWrapperNode(Node):
         """メイン制御ループ (dt周期で実行)"""
         if not self.odom_received:
             return
+
+        # 全障害物の /obstacle/state 受信を待機
+        if not self._all_obs_ready:
+            if len(self.obstacle_states) < self._expected_obs_count:
+                self.get_logger().info(
+                    f'Waiting for obstacles: {len(self.obstacle_states)}/{self._expected_obs_count}',
+                    throttle_duration_sec=1.0)
+                return
+            self._all_obs_ready = True
+            self.get_logger().info('All obstacles ready, starting control')
 
         # sim time ベースで dt を動的計算
         now = self.get_clock().now()

@@ -58,13 +58,14 @@ h(x) = ||p_rel||² - d_min²    (h > 0 = safe)
 | param | value |
 |-------|-------|
 | field | 5 x 5 m (X:[0,5], Y:[0,5]) |
-| start | (0.5, 1.0) |
-| goal | (4.5, 1.0) |
+| start | (0.5, 2.5) |
+| goal | (4.5, 2.5) |
 | world | `experiment_corner.world` |
-| obstacles | 1 x waypoint |
+| obstacles | 1 x waypoint, 4 x static |
 | obs radius | 0.25 m |
-| obs v_max | 0.3 m/s |
-| waypoints | (2.5,2.5) → (2.5,1.0) → (2.5,1.0) → (0.5,1.0) |
+| obs v_max | 0.3 m/s (waypoint), 0.0 (static) |
+| waypoints | (3.0,4.0) → (3.0,3.0) → (2.5,2.5) → (0.5,2.5) |
+| static walls | x=2.5, y=3.5/4.0/4.5/5.0 (縦一列) |
 
 ## Gazebo Physics
 
