@@ -39,6 +39,7 @@ install(PROGRAMS
   scripts/sensor_visualizer_node.py
   scripts/cmd_vel_converter.py
   scripts/scenario_obstacle_controller.py
+  scripts/run_batch_experiment.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

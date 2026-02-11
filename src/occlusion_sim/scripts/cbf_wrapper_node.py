@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """CBF Wrapper Node"""
+import json
 import math
+import os
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -32,6 +34,9 @@ class CBFWrapperNode(Node):
         self.declare_parameter('goal_y', sim_config.DEFAULT_GOAL[1])
         self.declare_parameter('body_frame_odom', False)
         self.declare_parameter('scenario_name', 'multi_random')
+        self.declare_parameter('auto_shutdown', False)
+        self.declare_parameter('sim_timeout', 30.0)
+        self.declare_parameter('result_file', '')
 
         # 制御パラメータ
         self.dt = sim_config.DT
@@ -46,6 +51,10 @@ class CBFWrapperNode(Node):
         # 障害物名→半径マップ (シナリオ設定から構築)
         sc = load_scenario(self.get_parameter('scenario_name').value)
         self._obs_radius_map = {o['name']: o['radius'] for o in sc.get('obstacles', [])}
+        self._obs_type_map = {
+            o['name']: (0 if o.get('behavior') == 'static' else 1)
+            for o in sc.get('obstacles', [])
+        }
 
         v_max = self.get_parameter('v_max').value
         a_max = self.get_parameter('a_max').value
@@ -73,9 +82,10 @@ class CBFWrapperNode(Node):
         # 状態変数
         self.X = np.zeros((4, 1))  # [x, y, vx, vy]
         self.odom_received = False
-        self.obs_list = np.empty((0, 5))  # [x, y, radius, vx, vy]
+        self.obs_list = np.empty((0, 8))  # [x, y, radius, vx, vy, _, _, obs_type]
         self.obstacle_states = {}
         self.goal_reached = False
+        self.sim_start_time = None
 
         # ROS通信
         self.create_subscription(Odometry, '/odom', self.odom_cb, 10)
@@ -103,19 +113,34 @@ class CBFWrapperNode(Node):
             self.X[2, 0] = msg.twist.twist.linear.x
             self.X[3, 0] = msg.twist.twist.linear.y
         self.odom_received = True
+        if self.sim_start_time is None:
+            self.sim_start_time = self.get_clock().now()
 
     def obs_cb(self, msg):
         """障害物の状態を更新"""
         name = msg.child_frame_id or 'obs_0'
         obs_radius = self._obs_radius_map.get(name, sim_config.OBSTACLE_RADIUS)
+        obs_type = self._obs_type_map.get(name, 1)  # 0: static, 1: dynamic
         self.obstacle_states[name] = [
             msg.pose.pose.position.x,
             msg.pose.pose.position.y,
             obs_radius,
             msg.twist.twist.linear.x,
-            msg.twist.twist.linear.y
+            msg.twist.twist.linear.y,
+            0.0, 0.0,
+            float(obs_type),
         ]
         self.obs_list = np.array(list(self.obstacle_states.values()))
+
+    def _write_result_and_exit(self, outcome, duration):
+        result_file = self.get_parameter('result_file').value
+        if result_file:
+            os.makedirs(os.path.dirname(result_file), exist_ok=True)
+            with open(result_file, 'w') as f:
+                json.dump({'outcome': outcome, 'duration': duration}, f)
+        self.get_logger().info(f'Auto-shutdown: {outcome} (duration={duration:.2f}s)')
+        self.cmd_pub.publish(Twist())
+        raise SystemExit
 
     def control_loop(self):
         """メイン制御ループ (dt周期で実行)"""
@@ -132,6 +157,9 @@ class CBFWrapperNode(Node):
                 self.robot.dt = dt
         self.last_time = now
 
+        auto_shutdown = self.get_parameter('auto_shutdown').value
+        sim_elapsed = (now - self.sim_start_time).nanoseconds * 1e-9 if self.sim_start_time else 0.0
+
         # ゴール到達判定
         dist = np.hypot(self.goal[0, 0] - self.X[0, 0], self.goal[1, 0] - self.X[1, 0])
         if dist < sim_config.GOAL_THRESHOLD:
@@ -139,7 +167,21 @@ class CBFWrapperNode(Node):
                 self.get_logger().info(f'Goal reached! (distance: {dist:.3f}m)')
                 self.goal_reached = True
             self.cmd_pub.publish(Twist())
+            if auto_shutdown:
+                self._write_result_and_exit('goal_reached', sim_elapsed)
             return
+
+        if auto_shutdown:
+            # 衝突検知
+            R_ego = self.robot_spec['radius']
+            for obs in self.obs_list:
+                d = np.hypot(self.X[0, 0] - obs[0], self.X[1, 0] - obs[1])
+                if d < R_ego + obs[2]:
+                    self._write_result_and_exit('collision', sim_elapsed)
+
+            # タイムアウト検知
+            if sim_elapsed > self.get_parameter('sim_timeout').value:
+                self._write_result_and_exit('timeout', sim_elapsed)
 
         # 可視障害物のフィルタリング (センシング範囲 & オクルージョン考慮)
         visible_obs, _ = self.occlusion_manager._filter_visible_and_build_occ(
@@ -152,7 +194,7 @@ class CBFWrapperNode(Node):
         if len(visible_obs) > 0:
             visible_obs_np = np.array(visible_obs)
         else:
-            visible_obs_np = np.empty((0, 5))
+            visible_obs_np = np.empty((0, 8))
 
         # ノミナル入力 (ゴール方向への加速度)
         u_ref = self.robot.nominal_input(self.X, self.goal)
@@ -233,7 +275,7 @@ def main(args=None):
     node = CBFWrapperNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
     finally:
         node.destroy_node()

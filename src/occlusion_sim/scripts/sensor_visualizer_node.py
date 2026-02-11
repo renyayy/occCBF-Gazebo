@@ -42,6 +42,10 @@ class SensorVisualizerNode(Node):
         # 障害物名→半径マップ (シナリオ設定から構築)
         sc = load_scenario(self.get_parameter('scenario_name').value)
         self._obs_radius_map = {o['name']: o['radius'] for o in sc.get('obstacles', [])}
+        self._obs_type_map = {
+            o['name']: (0 if o.get('behavior') == 'static' else 1)
+            for o in sc.get('obstacles', [])
+        }
 
         self.robot_spec = sim_config.make_robot_spec(radius=self.robot_radius)
         self.robot = DoubleIntegrator2D(sim_config.DT, self.robot_spec)
@@ -103,7 +107,8 @@ class SensorVisualizerNode(Node):
             'y': msg.pose.pose.position.y,
             'radius': obs_radius,
             'vx': msg.twist.twist.linear.x,
-            'vy': msg.twist.twist.linear.y
+            'vy': msg.twist.twist.linear.y,
+            'obs_type': self._obs_type_map.get(name, 1),
         }
 
     def publish_markers(self):
@@ -150,7 +155,9 @@ class SensorVisualizerNode(Node):
         # 障害物リストを準備（OcclusionUtils用）
         obs_list = []
         for name, obs in self.obstacle_states.items():
-            obs_list.append([obs['x'], obs['y'], obs['radius'], obs.get('vx', 0.0), obs.get('vy', 0.0)])
+            obs_list.append([obs['x'], obs['y'], obs['radius'],
+                            obs.get('vx', 0.0), obs.get('vy', 0.0),
+                            0.0, 0.0, float(obs.get('obs_type', 1))])
 
         if len(obs_list) == 0:
             delete_marker = Marker()

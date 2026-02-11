@@ -26,10 +26,70 @@ ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout experimen
 | 引数 | デフォルト | 説明 |
 |------|-----------|------|
 | `scenario` | `multi_random` | シナリオ名 |
-| `mode` | `di` | `di` or `unicycle` |
+| `mode` | `di` | `di` / `unicycle` / `unicycle-tb3` |
 | `record_bag` | `true` | rosbag録画の有無 |
 | `experiment_id` | タイムスタンプ | 実験ID (bag出力サブディレクトリ) |
 | `bag_output_dir` | `/root/Gazebo_ws/experiments` | bag出力ルート |
+| `auto_shutdown` | `false` | ゴール到達/衝突/タイムアウトで自動終了 |
+| `sim_timeout` | `30.0` | 自動終了のタイムアウト秒数 (sim time) |
+| `gui` | `true` | `false` で RViz2 を起動しない |
+
+### バッチ実験 (di vs unicycle 自動比較)
+
+`run_batch_experiment.py` で複数モードを順次実行し、結果を比較できる。
+
+```bash
+# 基本 (di → unicycle を順次実行、各30秒タイムアウト、GUI無し)
+python3 src/occlusion_sim/scripts/run_batch_experiment.py \
+  --scenario corner_popout --timeout 30
+
+# 実験ID指定・GUI有り
+python3 src/occlusion_sim/scripts/run_batch_experiment.py \
+  --scenario corner_popout --timeout 60 --experiment-id exp_001 --gui
+
+# モード指定 (unicycle-tb3 を含める)
+python3 src/occlusion_sim/scripts/run_batch_experiment.py \
+  --scenario corner_popout --modes di,unicycle,unicycle-tb3
+
+# multi_random シナリオ
+python3 src/occlusion_sim/scripts/run_batch_experiment.py \
+  --scenario multi_random --timeout 120
+```
+
+**CLI引数:**
+
+| 引数 | デフォルト | 説明 |
+|------|-----------|------|
+| `--scenario` | `corner_popout` | シナリオ名 |
+| `--experiment-id` | `batch_<timestamp>` | 実験ID (全モード共通) |
+| `--timeout` | `30.0` | sim time タイムアウト秒数 |
+| `--modes` | `di,unicycle` | カンマ区切りのモード一覧 |
+| `--gui` | off | 指定すると RViz2 を表示 |
+| `--experiments-dir` | `/root/Gazebo_ws/experiments` | 出力ルート |
+
+**出力ディレクトリ構造:**
+
+```
+experiments/
+├── gazebo_di/<experiment_id>/
+│   ├── result.json           # {"outcome": "goal_reached", "duration": 10.8}
+│   ├── <experiment_id>_0.db3 # rosbag
+│   ├── metadata.yaml
+│   ├── h_trajectory.png
+│   ├── min_distance.png
+│   └── tracking_error.png
+└── gazebo_unicycle/<experiment_id>/
+    ├── result.json           # {"outcome": "collision", "duration": 6.8}
+    └── ...
+```
+
+**自動終了条件** (`auto_shutdown:=true` 時):
+
+| 条件 | 判定 |
+|------|------|
+| ゴール到達 | ゴールまでの距離 < 0.3m |
+| 衝突 | 障害物との中心間距離 < robot_radius + obs_radius |
+| タイムアウト | sim time 経過 > sim_timeout |
 
 ### Python 数値シミュレーション
 

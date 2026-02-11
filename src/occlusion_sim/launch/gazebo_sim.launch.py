@@ -13,7 +13,7 @@ from datetime import datetime
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, ExecuteProcess,
                             IncludeLaunchDescription, SetEnvironmentVariable,
-                            TimerAction)
+                            Shutdown, TimerAction)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -51,6 +51,9 @@ def generate_launch_description():
 
     scenario_name = _get_argv('scenario', 'multi_random')
     mode = _get_argv('mode', 'di')
+    auto_shutdown = _get_argv('auto_shutdown', 'false')
+    sim_timeout = _get_argv('sim_timeout', '30.0')
+    gui = _get_argv('gui', 'true')
 
     is_di = (mode == 'di')
     is_unicycle = (mode == 'unicycle')
@@ -71,6 +74,18 @@ def generate_launch_description():
         robot_radius = robot_cfg['radius']
         robot_a_max = robot_cfg['a_max']
         body_frame_odom = False
+
+    # bag_subdir (result_file パス構築にも使用)
+    if is_tb3:
+        bag_subdir = 'gazebo_unicycle_tb3'
+    elif is_unicycle:
+        bag_subdir = 'gazebo_unicycle'
+    else:
+        bag_subdir = 'gazebo_di'
+
+    experiments_dir = _get_argv('bag_output_dir', '/root/Gazebo_ws/experiments')
+    experiment_id_str = _get_argv('experiment_id', timestamp)
+    result_file = os.path.join(experiments_dir, bag_subdir, experiment_id_str, 'result.json')
 
     # URDF / SDF 選択
     urdf_holonomic = os.path.join(pkg, 'urdf', 'simple_holonomic_robot.urdf')
@@ -103,6 +118,9 @@ def generate_launch_description():
         DeclareLaunchArgument('experiment_id', default_value=timestamp),
         DeclareLaunchArgument('bag_output_dir',
                               default_value='/root/Gazebo_ws/experiments'),
+        DeclareLaunchArgument('auto_shutdown', default_value='false'),
+        DeclareLaunchArgument('sim_timeout', default_value='30.0'),
+        DeclareLaunchArgument('gui', default_value='true'),
         gzserver,
     ])
 
@@ -142,6 +160,9 @@ def generate_launch_description():
         'robot_radius': robot_radius,
         'scenario_name': scenario_name,
         'body_frame_odom': body_frame_odom,
+        'auto_shutdown': auto_shutdown == 'true',
+        'sim_timeout': float(sim_timeout),
+        'result_file': result_file,
     }
 
     # --- センサビジュアライザ共通パラメータ ---
@@ -178,10 +199,12 @@ def generate_launch_description():
                        '-z', '0.2'],
             parameters=[sim_time_param], output='screen'))
 
-        ld.add_action(Node(
+        cbf_node = Node(
             package='occlusion_sim', executable='cbf_wrapper_node.py',
             parameters=[sim_time_param, cbf_params],
-            output='screen'))
+            output='screen',
+            **(dict(on_exit=[Shutdown()]) if auto_shutdown == 'true' else {}))
+        ld.add_action(cbf_node)
 
     elif is_unicycle:
         # Unicycle mode: orange cylinder + planar_move + converter
@@ -193,11 +216,13 @@ def generate_launch_description():
                        '-z', '0.2'],
             parameters=[sim_time_param], output='screen'))
 
-        ld.add_action(Node(
+        cbf_node = Node(
             package='occlusion_sim', executable='cbf_wrapper_node.py',
             remappings=[('/cmd_vel', '/di_cmd_vel')],
             parameters=[sim_time_param, cbf_params],
-            output='screen'))
+            output='screen',
+            **(dict(on_exit=[Shutdown()]) if auto_shutdown == 'true' else {}))
+        ld.add_action(cbf_node)
 
         ld.add_action(Node(
             package='occlusion_sim', executable='cmd_vel_converter.py',
@@ -219,11 +244,13 @@ def generate_launch_description():
                        '-z', '0.01'],
             parameters=[sim_time_param], output='screen'))
 
-        ld.add_action(Node(
+        cbf_node = Node(
             package='occlusion_sim', executable='cbf_wrapper_node.py',
             remappings=[('/cmd_vel', '/di_cmd_vel')],
             parameters=[sim_time_param, cbf_params],
-            output='screen'))
+            output='screen',
+            **(dict(on_exit=[Shutdown()]) if auto_shutdown == 'true' else {}))
+        ld.add_action(cbf_node)
 
         ld.add_action(Node(
             package='occlusion_sim', executable='cmd_vel_converter.py',
@@ -243,16 +270,10 @@ def generate_launch_description():
     ld.add_action(Node(
         package='rviz2', executable='rviz2',
         arguments=['-d', rviz_config],
-        parameters=[sim_time_param], output='screen'))
+        parameters=[sim_time_param], output='screen',
+        condition=IfCondition(LaunchConfiguration('gui'))))
 
     # --- rosbag録画 (record_bag:=true の場合のみ) ---
-    if is_tb3:
-        bag_subdir = 'gazebo_unicycle_tb3'
-    elif is_unicycle:
-        bag_subdir = 'gazebo_unicycle'
-    else:
-        bag_subdir = 'gazebo_di'
-
     ld.add_action(TimerAction(
         period=5.0,
         actions=[ExecuteProcess(

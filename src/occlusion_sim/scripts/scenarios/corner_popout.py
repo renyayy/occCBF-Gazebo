@@ -21,17 +21,28 @@ SCENARIO = {
     'obstacles': [
         {
             'name': 'obs_0',
-            'position': (2.5, 2.5),
+            'position': (3.0, 2.5),
             'radius': 0.25,
             'v_max': 0.3,
             'behavior': 'waypoint',
             'waypoints': [
-                (2.5, 2.5),    # Start above ego path midpoint
-                (2.5, 1.0),    # Cross ego path perpendicularly
-                (2.5, 1.0),    # Continue below
+                (3.0, 2.5),    # Start above ego path midpoint
+                (3.0, 2.0),    # Cross ego path perpendicularly
+                (3.0, 1.5),    # Continue below
+                (3.0, 1.3),    # Move aside
+                (2.8, 1.2),    # Move aside
+                (2.8, 1.0),    # Move aside
+                (1.0, 1.0),    # Move aside
                 (0.5, 1.0),    # Move aside
             ],
         },
+        {'name': 'wall_0', 'position': (2.5, 2.0), 'radius': 0.25, 'v_max': 0.0, 'behavior': 'static'},
+        {'name': 'wall_1', 'position': (2.5, 2.5), 'radius': 0.25, 'v_max': 0.0, 'behavior': 'static'},
+        {'name': 'wall_2', 'position': (2.5, 3.0), 'radius': 0.25, 'v_max': 0.0, 'behavior': 'static'},
+        {'name': 'wall_3', 'position': (2.5, 3.5), 'radius': 0.25, 'v_max': 0.0, 'behavior': 'static'},
+        {'name': 'wall_4', 'position': (2.5, 4.0), 'radius': 0.25, 'v_max': 0.0, 'behavior': 'static'},
+        {'name': 'wall_5', 'position': (2.5, 4.5), 'radius': 0.25, 'v_max': 0.0, 'behavior': 'static'},
+        {'name': 'wall_6', 'position': (2.5, 5.0), 'radius': 0.25, 'v_max': 0.0, 'behavior': 'static'},
     ],
     'cbf': {
         'T_horizon': 2.0,
