@@ -28,6 +28,7 @@ class ScenarioObstacleController(ObstacleControllerBase):
         random.seed(sc.get('seed', 42))
 
         self._obs_behaviors = {}
+        self._static_obs = set()
         self._ego_x = None
         self._ego_y = None
         needs_ego_odom = False
@@ -51,13 +52,30 @@ class ScenarioObstacleController(ObstacleControllerBase):
                 beh['x_min'] = env_cfg['x_min']
                 beh['x_max'] = env_cfg['x_max']
 
+            if behavior == 'static':
+                self._static_obs.add(name)
+
             self._obs_behaviors[name] = beh
+
+        # 静的障害物はシナリオ設定位置で即初期化 (Gazebo Odomの(0,0)問題を回避)
+        for obs_cfg in obs_configs:
+            if obs_cfg['behavior'] == 'static':
+                odom = Odometry()
+                odom.pose.pose.position.x = float(obs_cfg['position'][0])
+                odom.pose.pose.position.y = float(obs_cfg['position'][1])
+                self.obs_states[obs_cfg['name']] = odom
 
         if needs_ego_odom:
             self.create_subscription(Odometry, '/odom', self._ego_odom_cb, 10)
 
         self._all_obs_ready = False
         self.get_logger().info(f'Scenario Controller: {len(obs_names)} obstacles')
+
+    def _odom_cb(self, msg, name):
+        """静的障害物はGazebo Odomを無視 (設定位置を維持)"""
+        if name in self._static_obs:
+            return
+        super()._odom_cb(msg, name)
 
     def _ego_odom_cb(self, msg):
         self._ego_x = msg.pose.pose.position.x
