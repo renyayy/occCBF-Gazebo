@@ -1,21 +1,22 @@
-"""Experiment launch: scenario-based simulation with DI or Unicycle mode.
+"""Experiment launch: scenario-based simulation with DI, Unicycle, or Unicycle-TB3 mode.
 
 Usage:
-  ros2 launch occlusion_sim experiment.launch.py scenario:=corner_popout
-  ros2 launch occlusion_sim experiment.launch.py scenario:=multi_random mode:=unicycle
-  ros2 launch occlusion_sim experiment.launch.py scenario:=corner_popout record_bag:=false
+  ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout
+  ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=multi_random mode:=unicycle
+  ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout mode:=unicycle-tb3
+  ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout record_bag:=false
 """
 import os
+import re
 import sys
 from datetime import datetime
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, ExecuteProcess,
                             IncludeLaunchDescription, SetEnvironmentVariable,
                             TimerAction)
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import (LaunchConfiguration, PathJoinSubstitution,
-                                  PythonExpression)
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory, get_package_prefix
 
@@ -23,6 +24,7 @@ _lib_dir = os.path.join(get_package_prefix('occlusion_sim'), 'lib', 'occlusion_s
 if _lib_dir not in sys.path:
     sys.path.insert(0, _lib_dir)
 from scenarios import load_scenario
+import sim_config
 
 
 def _get_argv(key, default):
@@ -49,24 +51,40 @@ def generate_launch_description():
 
     scenario_name = _get_argv('scenario', 'multi_random')
     mode = _get_argv('mode', 'di')
-    use_unicycle = (mode == 'unicycle')
+
+    is_di = (mode == 'di')
+    is_unicycle = (mode == 'unicycle')
+    is_tb3 = (mode == 'unicycle-tb3')
+    uses_converter = is_unicycle or is_tb3
 
     sc = load_scenario(scenario_name)
     robot_cfg = sc['robot']
 
-    tb3_urdf, tb3_sdf = ('', '') if not use_unicycle else _resolve_tb3()
+    # モード別ロボットパラメータ
+    if is_tb3:
+        robot_v_max = sim_config.TB3_V_MAX
+        robot_radius = sim_config.TB3_ROBOT_RADIUS
+        robot_a_max = sim_config.TB3_A_MAX
+        body_frame_odom = True
+    else:
+        robot_v_max = robot_cfg['v_max']
+        robot_radius = robot_cfg['radius']
+        robot_a_max = robot_cfg['a_max']
+        body_frame_odom = False
+
+    # URDF / SDF 選択
+    urdf_holonomic = os.path.join(pkg, 'urdf', 'simple_holonomic_robot.urdf')
+    urdf_unicycle = os.path.join(pkg, 'urdf', 'simple_unicycle_robot.urdf')
+    tb3_urdf, tb3_sdf = ('', '') if not is_tb3 else _resolve_tb3()
 
     world = os.path.join(pkg, 'worlds', sc['gazebo']['world_file'])
-    urdf_holonomic = os.path.join(pkg, 'urdf', 'simple_holonomic_robot.urdf')
     rviz_config = os.path.join(pkg, 'rviz',
-        'sensor_viz_unicycle.rviz' if use_unicycle else 'sensor_viz.rviz')
+        'sensor_viz_unicycle.rviz' if is_tb3 else 'sensor_viz.rviz')
     sim_time_param = {'use_sim_time': True}
 
-    mode_lc = LaunchConfiguration('mode')
     record_bag = LaunchConfiguration('record_bag')
     experiment_id = LaunchConfiguration('experiment_id')
     bag_output_dir = LaunchConfiguration('bag_output_dir')
-    is_unicycle = PythonExpression(["'", mode_lc, "' == 'unicycle'"])
 
     # Gazebo server (公式launch経由で GAZEBO_MODEL_PATH を自動設定)
     gazebo_ros_launch = os.path.join(
@@ -88,12 +106,16 @@ def generate_launch_description():
         gzserver,
     ])
 
-    # --- 障害物スポーン ---
+    # --- 障害物スポーン (SDF半径をシナリオ設定に合わせる) ---
     sdf_template = os.path.join(pkg, 'models', 'dynamic_obstacle.sdf')
     for obs_cfg in sc.get('obstacles', []):
         name = obs_cfg['name']
+        obs_radius = obs_cfg['radius']
         with open(sdf_template, 'r') as f:
-            sdf_content = f.read().replace('/obs_{id}', f'/{name}')
+            sdf_content = f.read()
+        sdf_content = sdf_content.replace('/obs_{id}', f'/{name}')
+        sdf_content = re.sub(r'<radius>[^<]+</radius>',
+                             f'<radius>{obs_radius}</radius>', sdf_content)
         tmp_sdf = f'/tmp/{name}.sdf'
         with open(tmp_sdf, 'w') as f:
             f.write(sdf_content)
@@ -111,76 +133,110 @@ def generate_launch_description():
         parameters=[sim_time_param, {'scenario_name': scenario_name}],
         output='screen'))
 
-    # --- DI mode: holonomic robot ---
-    ld.add_action(Node(
-        package='gazebo_ros', executable='spawn_entity.py',
-        arguments=['-entity', 'ego_robot', '-file', urdf_holonomic,
-                   '-x', str(robot_cfg['start'][0]),
-                   '-y', str(robot_cfg['start'][1]),
-                   '-z', '0.2'],
-        parameters=[sim_time_param], output='screen',
-        condition=UnlessCondition(is_unicycle)))
+    # --- CBF共通パラメータ ---
+    cbf_params = {
+        'goal_x': robot_cfg['goal'][0],
+        'goal_y': robot_cfg['goal'][1],
+        'v_max': robot_v_max,
+        'a_max': robot_a_max,
+        'robot_radius': robot_radius,
+        'scenario_name': scenario_name,
+        'body_frame_odom': body_frame_odom,
+    }
 
-    ld.add_action(Node(
-        package='occlusion_sim', executable='cbf_wrapper_node.py',
-        parameters=[sim_time_param, {
-            'goal_x': robot_cfg['goal'][0],
-            'goal_y': robot_cfg['goal'][1],
-            'v_max': robot_cfg['v_max'],
-            'a_max': robot_cfg['a_max'],
-        }],
-        output='screen',
-        condition=UnlessCondition(is_unicycle)))
+    # --- センサビジュアライザ共通パラメータ ---
+    env_cfg = sc['env']
+    if is_tb3:
+        robot_model_str = 'tb3'
+    elif is_unicycle:
+        robot_model_str = 'unicycle'
+    else:
+        robot_model_str = 'holonomic'
 
-    # --- Unicycle mode: TurtleBot3 ---
-    ld.add_action(Node(
-        package='robot_state_publisher', executable='robot_state_publisher',
-        parameters=[{**sim_time_param, 'robot_description': tb3_urdf}],
-        output='screen',
-        condition=IfCondition(is_unicycle)))
+    viz_params = {
+        'start_x': robot_cfg['start'][0],
+        'start_y': robot_cfg['start'][1],
+        'goal_x': robot_cfg['goal'][0],
+        'goal_y': robot_cfg['goal'][1],
+        'env_x_min': env_cfg['x_min'],
+        'env_x_max': env_cfg['x_max'],
+        'env_y_min': env_cfg['y_min'],
+        'env_y_max': env_cfg['y_max'],
+        'robot_model': robot_model_str,
+        'robot_radius': robot_radius,
+        'scenario_name': scenario_name,
+    }
 
-    ld.add_action(Node(
-        package='gazebo_ros', executable='spawn_entity.py',
-        arguments=['-entity', 'ego_robot', '-file', tb3_sdf,
-                   '-x', str(robot_cfg['start'][0]),
-                   '-y', str(robot_cfg['start'][1]),
-                   '-z', '0.01'],
-        parameters=[sim_time_param], output='screen',
-        condition=IfCondition(is_unicycle)))
+    # --- モード別エゴロボット構成 ---
+    if is_di:
+        # DI mode: holonomic robot
+        ld.add_action(Node(
+            package='gazebo_ros', executable='spawn_entity.py',
+            arguments=['-entity', 'ego_robot', '-file', urdf_holonomic,
+                       '-x', str(robot_cfg['start'][0]),
+                       '-y', str(robot_cfg['start'][1]),
+                       '-z', '0.2'],
+            parameters=[sim_time_param], output='screen'))
 
-    ld.add_action(Node(
-        package='occlusion_sim', executable='cbf_wrapper_node.py',
-        remappings=[('/cmd_vel', '/di_cmd_vel')],
-        parameters=[sim_time_param, {
-            'goal_x': robot_cfg['goal'][0],
-            'goal_y': robot_cfg['goal'][1],
-            'v_max': 0.22,
-            'a_max': robot_cfg['a_max'],
-            'body_frame_odom': True,
-        }],
-        output='screen',
-        condition=IfCondition(is_unicycle)))
+        ld.add_action(Node(
+            package='occlusion_sim', executable='cbf_wrapper_node.py',
+            parameters=[sim_time_param, cbf_params],
+            output='screen'))
 
-    ld.add_action(Node(
-        package='occlusion_sim', executable='cmd_vel_converter.py',
-        parameters=[sim_time_param], output='screen',
-        condition=IfCondition(is_unicycle)))
+    elif is_unicycle:
+        # Unicycle mode: orange cylinder + planar_move + converter
+        ld.add_action(Node(
+            package='gazebo_ros', executable='spawn_entity.py',
+            arguments=['-entity', 'ego_robot', '-file', urdf_unicycle,
+                       '-x', str(robot_cfg['start'][0]),
+                       '-y', str(robot_cfg['start'][1]),
+                       '-z', '0.2'],
+            parameters=[sim_time_param], output='screen'))
+
+        ld.add_action(Node(
+            package='occlusion_sim', executable='cbf_wrapper_node.py',
+            remappings=[('/cmd_vel', '/di_cmd_vel')],
+            parameters=[sim_time_param, cbf_params],
+            output='screen'))
+
+        ld.add_action(Node(
+            package='occlusion_sim', executable='cmd_vel_converter.py',
+            parameters=[sim_time_param, {'max_v': robot_v_max}],
+            output='screen'))
+
+    elif is_tb3:
+        # Unicycle-TB3 mode: TurtleBot3 Burger
+        ld.add_action(Node(
+            package='robot_state_publisher', executable='robot_state_publisher',
+            parameters=[{**sim_time_param, 'robot_description': tb3_urdf}],
+            output='screen'))
+
+        ld.add_action(Node(
+            package='gazebo_ros', executable='spawn_entity.py',
+            arguments=['-entity', 'ego_robot', '-file', tb3_sdf,
+                       '-x', str(robot_cfg['start'][0]),
+                       '-y', str(robot_cfg['start'][1]),
+                       '-z', '0.01'],
+            parameters=[sim_time_param], output='screen'))
+
+        ld.add_action(Node(
+            package='occlusion_sim', executable='cbf_wrapper_node.py',
+            remappings=[('/cmd_vel', '/di_cmd_vel')],
+            parameters=[sim_time_param, cbf_params],
+            output='screen'))
+
+        ld.add_action(Node(
+            package='occlusion_sim', executable='cmd_vel_converter.py',
+            parameters=[sim_time_param, {
+                'max_v': sim_config.TB3_V_MAX,
+                'max_w': sim_config.TB3_MAX_OMEGA,
+            }],
+            output='screen'))
 
     # --- センサビジュアライザ ---
-    env_cfg = sc['env']
     ld.add_action(Node(
         package='occlusion_sim', executable='sensor_visualizer_node.py',
-        parameters=[sim_time_param, {
-            'start_x': robot_cfg['start'][0],
-            'start_y': robot_cfg['start'][1],
-            'goal_x': robot_cfg['goal'][0],
-            'goal_y': robot_cfg['goal'][1],
-            'env_x_min': env_cfg['x_min'],
-            'env_x_max': env_cfg['x_max'],
-            'env_y_min': env_cfg['y_min'],
-            'env_y_max': env_cfg['y_max'],
-            'robot_model': 'unicycle' if use_unicycle else 'holonomic',
-        }],
+        parameters=[sim_time_param, viz_params],
         output='screen'))
 
     # --- RViz2 ---
@@ -190,8 +246,13 @@ def generate_launch_description():
         parameters=[sim_time_param], output='screen'))
 
     # --- rosbag録画 (record_bag:=true の場合のみ) ---
-    bag_subdir = PythonExpression([
-        "'gazebo_unicycle' if '", mode_lc, "' == 'unicycle' else 'gazebo_di'"])
+    if is_tb3:
+        bag_subdir = 'gazebo_unicycle_tb3'
+    elif is_unicycle:
+        bag_subdir = 'gazebo_unicycle'
+    else:
+        bag_subdir = 'gazebo_di'
+
     ld.add_action(TimerAction(
         period=5.0,
         actions=[ExecuteProcess(

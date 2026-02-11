@@ -12,6 +12,7 @@ import sim_config  # safe_control パスも設定される
 
 from robots.double_integrator2D import DoubleIntegrator2D
 from utils.occlusion import OcclusionUtils
+from scenarios import load_scenario
 
 
 class SensorVisualizerNode(Node):
@@ -28,13 +29,21 @@ class SensorVisualizerNode(Node):
         self.declare_parameter('env_y_min', sim_config.ENV_Y_MIN)
         self.declare_parameter('env_y_max', sim_config.ENV_Y_MAX)
         self.declare_parameter('robot_model', 'holonomic')
-        self.is_unicycle = self.get_parameter('robot_model').value == 'unicycle'
+        self.declare_parameter('robot_radius', sim_config.ROBOT_RADIUS)
+        self.declare_parameter('scenario_name', 'multi_random')
+
+        robot_model = self.get_parameter('robot_model').value
+        self.is_tb3 = (robot_model == 'tb3')
+        self.is_unicycle_color = (robot_model == 'unicycle')
 
         self.sensing_range = sim_config.SENSING_RANGE
-        self.robot_radius = sim_config.ROBOT_RADIUS
-        self.obstacle_radius = sim_config.OBSTACLE_RADIUS
+        self.robot_radius = self.get_parameter('robot_radius').value
 
-        self.robot_spec = sim_config.make_robot_spec()
+        # 障害物名→半径マップ (シナリオ設定から構築)
+        sc = load_scenario(self.get_parameter('scenario_name').value)
+        self._obs_radius_map = {o['name']: o['radius'] for o in sc.get('obstacles', [])}
+
+        self.robot_spec = sim_config.make_robot_spec(radius=self.robot_radius)
         self.robot = DoubleIntegrator2D(sim_config.DT, self.robot_spec)
 
         self.occlusion_manager = OcclusionUtils(
@@ -88,10 +97,11 @@ class SensorVisualizerNode(Node):
 
     def obs_cb(self, msg):
         name = msg.child_frame_id or 'obs_0'
+        obs_radius = self._obs_radius_map.get(name, sim_config.OBSTACLE_RADIUS)
         self.obstacle_states[name] = {
             'x': msg.pose.pose.position.x,
             'y': msg.pose.pose.position.y,
-            'radius': self.obstacle_radius,
+            'radius': obs_radius,
             'vx': msg.twist.twist.linear.x,
             'vy': msg.twist.twist.linear.y
         }
@@ -105,7 +115,7 @@ class SensorVisualizerNode(Node):
         self.publish_start_goal_markers()
         self.publish_boundary_marker()
         self.publish_ground_marker()
-        if not self.is_unicycle:
+        if not self.is_tb3:
             self.publish_ego_robot_marker()
 
     def publish_sensing_range_marker(self):
@@ -335,7 +345,10 @@ class SensorVisualizerNode(Node):
         marker.scale.x = self.robot_radius * 2
         marker.scale.y = self.robot_radius * 2
         marker.scale.z = 0.2
-        marker.color = ColorRGBA(r=0.5, g=0.0, b=0.5, a=0.9)
+        if self.is_unicycle_color:
+            marker.color = ColorRGBA(r=1.0, g=0.5, b=0.0, a=0.9)  # orange
+        else:
+            marker.color = ColorRGBA(r=0.5, g=0.0, b=0.5, a=0.9)  # purple
 
         self.ego_robot_pub.publish(marker)
 

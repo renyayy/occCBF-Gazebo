@@ -18,6 +18,7 @@ from position_control.optimal_decay_cbf_qp import OptimalDecayCBFQP
 from position_control.optimal_decay_mpc_cbf import OptimalDecayMPCCBF
 
 from utils.occlusion import OcclusionUtils
+from scenarios import load_scenario
 
 class CBFWrapperNode(Node):
     def __init__(self):
@@ -26,9 +27,11 @@ class CBFWrapperNode(Node):
         # ROS パラメータ
         self.declare_parameter('v_max', sim_config.ROBOT_V_MAX)
         self.declare_parameter('a_max', sim_config.ROBOT_A_MAX)
+        self.declare_parameter('robot_radius', sim_config.ROBOT_RADIUS)
         self.declare_parameter('goal_x', sim_config.DEFAULT_GOAL[0])
         self.declare_parameter('goal_y', sim_config.DEFAULT_GOAL[1])
         self.declare_parameter('body_frame_odom', False)
+        self.declare_parameter('scenario_name', 'multi_random')
 
         # 制御パラメータ
         self.dt = sim_config.DT
@@ -39,11 +42,15 @@ class CBFWrapperNode(Node):
             [0.0]
         ])
         self.body_frame_odom = self.get_parameter('body_frame_odom').value
-        self.obstacle_radius = sim_config.OBSTACLE_RADIUS
+
+        # 障害物名→半径マップ (シナリオ設定から構築)
+        sc = load_scenario(self.get_parameter('scenario_name').value)
+        self._obs_radius_map = {o['name']: o['radius'] for o in sc.get('obstacles', [])}
 
         v_max = self.get_parameter('v_max').value
         a_max = self.get_parameter('a_max').value
-        self.robot_spec = sim_config.make_robot_spec(v_max, a_max)
+        robot_radius = self.get_parameter('robot_radius').value
+        self.robot_spec = sim_config.make_robot_spec(v_max, a_max, radius=robot_radius)
 
         # ロボットモデル
         self.robot = DoubleIntegrator2D(self.dt, self.robot_spec)
@@ -100,10 +107,11 @@ class CBFWrapperNode(Node):
     def obs_cb(self, msg):
         """障害物の状態を更新"""
         name = msg.child_frame_id or 'obs_0'
+        obs_radius = self._obs_radius_map.get(name, sim_config.OBSTACLE_RADIUS)
         self.obstacle_states[name] = [
             msg.pose.pose.position.x,
             msg.pose.pose.position.y,
-            self.obstacle_radius,
+            obs_radius,
             msg.twist.twist.linear.x,
             msg.twist.twist.linear.y
         ]

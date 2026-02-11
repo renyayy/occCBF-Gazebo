@@ -34,7 +34,9 @@ U_REF_X = 8; U_REF_Y = 9; ROBOT_X = 10; ROBOT_Y = 11
 ROBOT_VX = 12; ROBOT_VY = 13; STATUS_OK = 14
 N_VISIBLE = 15; N_TOTAL = 16
 
-COLLISION_DIST = 0.25 + 0.3  # robot_radius + obstacle_radius
+DEFAULT_ROBOT_RADIUS = 0.25
+DEFAULT_OBSTACLE_RADIUS = 0.3
+COLLISION_DIST = DEFAULT_ROBOT_RADIUS + DEFAULT_OBSTACLE_RADIUS
 GOAL_THRESHOLD = 0.3
 
 
@@ -179,7 +181,12 @@ def main():
     parser.add_argument('--output', '-o', default=None, help='Output directory for plots')
     parser.add_argument('--goal', nargs=2, type=float, default=[20.0, 7.5],
                         metavar=('X', 'Y'), help='Goal position (default: 20.0 7.5)')
+    parser.add_argument('--robot-radius', type=float, default=DEFAULT_ROBOT_RADIUS)
+    parser.add_argument('--obstacle-radius', type=float, default=DEFAULT_OBSTACLE_RADIUS)
     args = parser.parse_args()
+
+    global COLLISION_DIST
+    COLLISION_DIST = args.robot_radius + args.obstacle_radius
 
     output_dir = args.output or (os.path.dirname(args.data_path)
                                   if os.path.isfile(args.data_path)

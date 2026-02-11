@@ -1,4 +1,4 @@
-"""Corner Pop-out scenario - dynamic obstacle crosses ego path diagonally (5x5m).
+"""Corner Pop-out scenario - dynamic obstacle crosses ego path perpendicularly (5x5m).
 
 References: .docs/plans/実験環境.md
 - 5m x 5m field
@@ -21,15 +21,15 @@ SCENARIO = {
     'obstacles': [
         {
             'name': 'obs_0',
-            'position': (4.0, 3.5),
-            'radius': 0.15,
+            'position': (2.5, 2.5),
+            'radius': 0.25,
             'v_max': 0.3,
             'behavior': 'waypoint',
             'waypoints': [
-                (4.0, 3.5),    # Start upper-right
-                (2.5, 2.0),    # Diagonal descent
-                (1.5, 1.2),    # Approach ego path
-                (0.5, 1.0),    # Ego start position (stop)
+                (2.5, 2.5),    # Start above ego path midpoint
+                (2.5, 1.0),    # Cross ego path perpendicularly
+                (2.5, 1.0),    # Continue below
+                (0.5, 1.0),    # Move aside
             ],
         },
     ],
