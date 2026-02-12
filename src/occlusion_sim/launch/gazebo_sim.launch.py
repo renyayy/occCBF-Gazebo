@@ -278,7 +278,7 @@ def generate_launch_description():
 
     # --- rosbag録画 (record_bag:=true の場合のみ) ---
     ld.add_action(TimerAction(
-        period=5.0,
+        period=1.0,
         actions=[ExecuteProcess(
             cmd=['ros2', 'bag', 'record',
                  '-o', PathJoinSubstitution([bag_output_dir, bag_subdir, experiment_id]),

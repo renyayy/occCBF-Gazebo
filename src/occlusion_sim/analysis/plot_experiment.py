@@ -22,6 +22,7 @@
 """
 import argparse
 import os
+import sys
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -152,6 +153,64 @@ def plot_tracking_error(t, u_err, interventions, output_dir):
     plt.close(fig)
 
 
+def plot_trajectory(data, goal, output_dir, scenario=None):
+    x = data[:, ROBOT_X]
+    y = data[:, ROBOT_Y]
+
+    if scenario:
+        env = scenario['env']
+        w, h = env['x_max'] - env['x_min'], env['y_max'] - env['y_min']
+    else:
+        w = max(x.max() - x.min(), 1.0) * 1.2
+        h = max(y.max() - y.min(), 1.0) * 1.2
+    fig_w = min(10, max(6, w))
+    fig, ax = plt.subplots(figsize=(fig_w, max(4, fig_w * h / w)))
+
+    # Ego trajectory
+    ax.plot(x, y, 'k-', linewidth=1.0)
+
+    # Start / Goal
+    if scenario:
+        sx, sy = scenario['robot']['start']
+    else:
+        sx, sy = x[0], y[0]
+    ax.plot(sx, sy, 'bo', markersize=8, label='Start', zorder=5)
+    ax.plot(*goal, 'ro', markersize=8, label='Goal', zorder=5)
+
+    # Scenario overlay
+    if scenario:
+        env = scenario['env']
+        rect = plt.Rectangle((env['x_min'], env['y_min']),
+                              env['x_max'] - env['x_min'], env['y_max'] - env['y_min'],
+                              fill=False, edgecolor='gray', linestyle='--', linewidth=1)
+        ax.add_patch(rect)
+        for obs in scenario['obstacles']:
+            if obs.get('behavior') == 'static':
+                px, py = obs['position']
+                circle = plt.Circle((px, py), obs['radius'], fill=True, alpha=0.4,
+                                    facecolor='dimgray', edgecolor='dimgray')
+                ax.add_patch(circle)
+            elif 'waypoints' in obs:
+                wps = np.array(obs['waypoints'])
+                ax.plot(wps[:, 0], wps[:, 1], '--', color='salmon', linewidth=1.0, alpha=0.7)
+        ax.set_xlim(env['x_min'] - 0.5, env['x_max'] + 0.5)
+        ax.set_ylim(env['y_min'] - 0.5, env['y_max'] + 0.5)
+    else:
+        margin = 0.5
+        ax.set_xlim(min(x.min(), goal[0]) - margin, max(x.max(), goal[0]) + margin)
+        ax.set_ylim(min(y.min(), goal[1]) - margin, max(y.max(), goal[1]) + margin)
+
+    ax.set_aspect('equal')
+    ax.set_xlabel('X [m]')
+    ax.set_ylabel('Y [m]')
+    ax.set_title('Ego Robot Trajectory')
+    ax.legend(loc='upper left')
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(os.path.join(output_dir, 'trajectory.png'), dpi=150)
+    plt.close(fig)
+
+
 def print_stats(t, data, outcome, outcome_idx):
     h = data[:, H_MIN]
     dist = data[:, MIN_DIST]
@@ -183,7 +242,19 @@ def main():
                         metavar=('X', 'Y'), help='Goal position (default: 20.0 7.5)')
     parser.add_argument('--robot-radius', type=float, default=DEFAULT_ROBOT_RADIUS)
     parser.add_argument('--obstacle-radius', type=float, default=DEFAULT_OBSTACLE_RADIUS)
+    parser.add_argument('--scenario', default=None, help='Scenario name (auto-loads goal, env, obstacles)')
     args = parser.parse_args()
+
+    # Load scenario if specified
+    scenario = None
+    if args.scenario:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+        from scenarios import load_scenario
+        scenario = load_scenario(args.scenario)
+        # Override goal from scenario unless explicitly provided
+        if args.goal == [20.0, 7.5]:  # default not overridden
+            sc_goal = scenario['robot']['goal']
+            args.goal = list(sc_goal)
 
     global COLLISION_DIST
     COLLISION_DIST = args.robot_radius + args.obstacle_radius
@@ -209,6 +280,7 @@ def main():
 
     u_err = np.hypot(data[:, U_X] - data[:, U_REF_X], data[:, U_Y] - data[:, U_REF_Y])
     plot_tracking_error(t, u_err, data[:, INTERVENTION], output_dir)
+    plot_trajectory(data, goal, output_dir, scenario)
 
     print(f'\nPlots saved to: {output_dir}/')
 
