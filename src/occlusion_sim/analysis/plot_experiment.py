@@ -105,7 +105,7 @@ def detect_outcome(data, goal):
         idx = np.argmax(dists < GOAL_THRESHOLD)
         return 'goal_reached', idx
     finite_dist = data[:, MIN_DIST][np.isfinite(data[:, MIN_DIST])]
-    if len(finite_dist) > 0 and np.min(finite_dist) < COLLISION_DIST:
+    if len(finite_dist) > 0 and np.min(finite_dist) <= COLLISION_DIST:
         idx = np.argmin(data[:, MIN_DIST])
         return 'collision', idx
     return 'timeout', len(data) - 1

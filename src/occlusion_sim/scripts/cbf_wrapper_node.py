@@ -217,7 +217,7 @@ class CBFWrapperNode(Node):
             R_ego = self.robot_spec['radius']
             for obs in self.obs_list:
                 d = np.hypot(self.X[0, 0] - obs[0], self.X[1, 0] - obs[1])
-                if d < R_ego + obs[2]:
+                if d <= R_ego + obs[2]:
                     self._write_result_and_exit('collision', sim_elapsed)
                     return
 
