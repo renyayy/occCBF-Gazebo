@@ -31,28 +31,12 @@ h(x) = ||p_rel||² - d_min²    (h > 0 = safe)
 
 | scenario | r_robot | r_obs | d_min |
 |----------|---------|-------|-------|
-| multi_random (di/uni) | 0.25 | 0.30 | 0.55 m |
-| multi_random (tb3) | 0.105 | 0.30 | 0.405 m |
 | corner_popout (di/uni) | 0.25 | 0.25 | 0.50 m |
 | corner_popout (tb3) | 0.105 | 0.25 | 0.355 m |
 
 計算箇所: `backup_cbf_qp.py:230`, `double_integrator2D.py:173`, `cbf_wrapper_node.py:193`
 
 ## Scenarios
-
-### multi_random
-
-| param | value |
-|-------|-------|
-| field | 24 x 13 m (X:[0,24], Y:[1,14]) |
-| start | (1.0, 7.5) |
-| goal | (20.0, 7.5) |
-| world | `multi_obstacle.world` |
-| sensing_range | 10.0 m |
-| obstacles | 5 x random_walk |
-| obs radius | 0.3 m |
-| obs v_max | 0.5 m/s |
-| seed | 42 |
 
 ### corner_popout
 
@@ -71,13 +55,13 @@ h(x) = ||p_rel||² - d_min²    (h > 0 = safe)
 
 ## Gazebo Physics
 
-| param | experiment_corner | multi_obstacle |
-|-------|:-----------------:|:--------------:|
-| solver | ODE quick | ODE (default) |
-| max_step_size | 0.004 s | 0.001 s |
-| real_time_update_rate | 250 Hz | 1000 Hz |
-| gravity | -9.8066 | -9.8 |
-| planar_move update_rate | 100 Hz | 100 Hz |
+| param | experiment_corner |
+|-------|:-----------------:|
+| solver | ODE quick |
+| max_step_size | 0.004 s |
+| real_time_update_rate | 250 Hz |
+| gravity | -9.8066 |
+| planar_move update_rate | 100 Hz |
 
 ## Parameter Flow
 

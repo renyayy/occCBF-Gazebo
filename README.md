@@ -54,29 +54,28 @@ ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=<scenario> mode:=<mode>
 
 | scenario | 説明 | フィールド |
 |----------|------|-----------|
-| `multi_random` (default) | 5障害物ランダムウォーク | 24×13m |
-| `corner_popout` | 死角から障害物が飛び出す | 5×5m |
+| `corner_popout` (default) | 死角から障害物が飛び出す | 5×5m |
 
 追加方法: [scenarios/README.md](src/occlusion_sim/scripts/scenarios/README.md)
 
 ### 実行例
 ```bash
-# DI モード
-ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=multi_random
+# DI モード (デフォルト: corner_popout)
+ros2 launch occlusion_sim gazebo_sim.launch.py
 
 # Unicycle モード
-ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout mode:=unicycle
+ros2 launch occlusion_sim gazebo_sim.launch.py mode:=unicycle
 
 # TurtleBot3 モード
-ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout mode:=unicycle-tb3
+ros2 launch occlusion_sim gazebo_sim.launch.py mode:=unicycle-tb3
 
 # bag録画なし / 実験ID指定
-ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout record_bag:=false experiment_id:=test_001
+ros2 launch occlusion_sim gazebo_sim.launch.py record_bag:=false experiment_id:=test_001
 ```
 
 | 引数 | デフォルト | 説明 |
 |------|-----------|------|
-| `scenario` | `multi_random` | シナリオ名 |
+| `scenario` | `corner_popout` | シナリオ名 |
 | `mode` | `di` | `di` / `unicycle` / `unicycle-tb3` |
 | `record_bag` | `true` | rosbag自動記録 |
 | `experiment_id` | タイムスタンプ | bag保存先サブディレクトリ名 |
@@ -111,31 +110,31 @@ python3 src/occlusion_sim/analysis/run_numerical_sim.py --scenario corner_popout
 
 ### プロット生成
 ```bash
-# rosbag
+# rosbag (シナリオからgoal・半径を自動取得)
 python3 src/occlusion_sim/analysis/plot_experiment.py experiments/gazebo_di/test_001
 
 # CSV
 python3 src/occlusion_sim/analysis/plot_experiment.py experiments/python_di/test_001/cbf_debug.csv
 
-# unicycle-tb3 の場合は半径を指定
+# シナリオ・半径を明示指定する場合
 python3 src/occlusion_sim/analysis/plot_experiment.py experiments/gazebo_unicycle_tb3/test_001 --robot-radius 0.105
 ```
 
-出力: `h_trajectory.png`, `min_distance.png`, `tracking_error.png`
+出力: `h_trajectory.png`, `min_distance.png`, `tracking_error.png`, `trajectory.png`
 
 ### バッチ実験 (`run_batch_experiment.py`)
 
 複数モード・複数回の実験を連続実行し、結果を集計する。
 
 ```bash
-# モード比較（1回ずつ、従来動作）
-python3 src/occlusion_sim/scripts/run_batch_experiment.py --scenario corner_popout --modes di,unicycle
+# di vs unicycle を各3回（統計比較）
+python3 src/occlusion_sim/scripts/run_batch_experiment.py --modes di,unicycle --runs 3
 
-# 同一条件を10回繰り返し（統計分析用）
-python3 src/occlusion_sim/scripts/run_batch_experiment.py --scenario corner_popout --modes di --runs 10
+# モード比較（1回ずつ）
+python3 src/occlusion_sim/scripts/run_batch_experiment.py --modes di,unicycle
 
 # 実験ID指定 + 複数モード × 5回
-python3 src/occlusion_sim/scripts/run_batch_experiment.py --scenario corner_popout --modes di,unicycle --runs 5 --experiment-id stat_001
+python3 src/occlusion_sim/scripts/run_batch_experiment.py --modes di,unicycle --runs 5 --experiment-id stat_001
 ```
 
 | 引数 | デフォルト | 説明 |

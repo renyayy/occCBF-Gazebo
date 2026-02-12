@@ -2,7 +2,7 @@
 
 Usage:
   ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout
-  ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=multi_random mode:=unicycle
+  ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout mode:=unicycle
   ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout mode:=unicycle-tb3
   ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout record_bag:=false
 """
@@ -49,7 +49,7 @@ def generate_launch_description():
     pkg = get_package_share_directory('occlusion_sim')
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-    scenario_name = _get_argv('scenario', 'multi_random')
+    scenario_name = _get_argv('scenario', 'corner_popout')
     mode = _get_argv('mode', 'di')
     auto_shutdown = _get_argv('auto_shutdown', 'false')
     sim_timeout = _get_argv('sim_timeout', '30.0')
@@ -114,7 +114,7 @@ def generate_launch_description():
     ld = LaunchDescription([
         SetEnvironmentVariable('TURTLEBOT3_MODEL', 'burger'),
         DeclareLaunchArgument('mode', default_value='di'),
-        DeclareLaunchArgument('scenario', default_value='multi_random'),
+        DeclareLaunchArgument('scenario', default_value='corner_popout'),
         DeclareLaunchArgument('record_bag', default_value='true'),
         DeclareLaunchArgument('experiment_id', default_value=timestamp),
         DeclareLaunchArgument('bag_output_dir',

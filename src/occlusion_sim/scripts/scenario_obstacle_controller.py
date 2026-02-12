@@ -18,7 +18,7 @@ class ScenarioObstacleController(ObstacleControllerBase):
     def __init__(self):
         super().__init__('scenario_obstacle_controller')
 
-        self.declare_parameter('scenario_name', 'multi_random')
+        self.declare_parameter('scenario_name', 'corner_popout')
         scenario_name = self.get_parameter('scenario_name').value
 
         sc = load_scenario(scenario_name)

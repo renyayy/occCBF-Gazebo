@@ -1,9 +1,8 @@
 """Scenario registry for unified Python / Gazebo experiment environments."""
-from scenarios import corner_popout, multi_random
+from scenarios import corner_popout
 
 SCENARIOS = {
     'corner_popout': corner_popout.SCENARIO,
-    'multi_random': multi_random.SCENARIO,
 }
 
 

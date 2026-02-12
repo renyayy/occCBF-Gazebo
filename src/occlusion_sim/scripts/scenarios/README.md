@@ -7,12 +7,11 @@ Python / Gazebo 共通のシナリオ定義。各シナリオファイルが `SC
 ### Gazebo シミュレーション
 
 ```bash
-# DI (Double Integrator) モデル
-ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout
-ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=multi_random
+# DI (Double Integrator) モデル (デフォルト: corner_popout)
+ros2 launch occlusion_sim gazebo_sim.launch.py
 
 # Unicycle (TurtleBot3 Burger) モデル
-ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout mode:=unicycle
+ros2 launch occlusion_sim gazebo_sim.launch.py mode:=unicycle
 
 # rosbag録画なし
 ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout record_bag:=false
@@ -25,7 +24,7 @@ ros2 launch occlusion_sim gazebo_sim.launch.py scenario:=corner_popout experimen
 
 | 引数 | デフォルト | 説明 |
 |------|-----------|------|
-| `scenario` | `multi_random` | シナリオ名 |
+| `scenario` | `corner_popout` | シナリオ名 |
 | `mode` | `di` | `di` / `unicycle` / `unicycle-tb3` |
 | `record_bag` | `true` | rosbag録画の有無 |
 | `experiment_id` | タイムスタンプ | 実験ID (bag出力サブディレクトリ) |
@@ -51,9 +50,6 @@ python3 src/occlusion_sim/scripts/run_batch_experiment.py \
 python3 src/occlusion_sim/scripts/run_batch_experiment.py \
   --scenario corner_popout --modes di,unicycle,unicycle-tb3
 
-# multi_random シナリオ
-python3 src/occlusion_sim/scripts/run_batch_experiment.py \
-  --scenario multi_random --timeout 120
 ```
 
 **CLI引数:**
@@ -97,17 +93,12 @@ experiments/
 python3 src/occlusion_sim/analysis/run_numerical_sim.py \
   --scenario corner_popout \
   -o experiments/python_di/corner_001
-
-python3 src/occlusion_sim/analysis/run_numerical_sim.py \
-  --scenario multi_random \
-  -o experiments/python_di/multi_001
 ```
 
 ## 利用可能なシナリオ
 
 | 名前 | 説明 | フィールド |
 |------|------|-----------|
-| `multi_random` | 5障害物ランダムウォーク | 24x13m |
 | `corner_popout` | 障害物がエゴ経路を斜めに横切る | 5x5m |
 
 ## 新しいシナリオの作り方

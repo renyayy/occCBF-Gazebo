@@ -36,9 +36,11 @@ ROBOT_VX = 12; ROBOT_VY = 13; STATUS_OK = 14
 N_VISIBLE = 15; N_TOTAL = 16
 
 DEFAULT_ROBOT_RADIUS = 0.25
-DEFAULT_OBSTACLE_RADIUS = 0.3
+DEFAULT_OBSTACLE_RADIUS = 0.25
 COLLISION_DIST = DEFAULT_ROBOT_RADIUS + DEFAULT_OBSTACLE_RADIUS
 GOAL_THRESHOLD = 0.3
+DEFAULT_SCENARIO = 'corner_popout'
+DEFAULT_GOAL = [4.5, 2.5]
 
 
 def load_experiment_data(path):
@@ -238,23 +240,27 @@ def main():
     parser = argparse.ArgumentParser(description='Analyze experiment data (rosbag or CSV)')
     parser.add_argument('data_path', help='Path to rosbag2 directory or CSV file')
     parser.add_argument('--output', '-o', default=None, help='Output directory for plots')
-    parser.add_argument('--goal', nargs=2, type=float, default=[20.0, 7.5],
-                        metavar=('X', 'Y'), help='Goal position (default: 20.0 7.5)')
-    parser.add_argument('--robot-radius', type=float, default=DEFAULT_ROBOT_RADIUS)
-    parser.add_argument('--obstacle-radius', type=float, default=DEFAULT_OBSTACLE_RADIUS)
-    parser.add_argument('--scenario', default=None, help='Scenario name (auto-loads goal, env, obstacles)')
+    parser.add_argument('--goal', nargs=2, type=float, default=None,
+                        metavar=('X', 'Y'), help='Goal position (default: from scenario)')
+    parser.add_argument('--robot-radius', type=float, default=None)
+    parser.add_argument('--obstacle-radius', type=float, default=None)
+    parser.add_argument('--scenario', default=DEFAULT_SCENARIO,
+                        help=f'Scenario name (default: {DEFAULT_SCENARIO})')
     args = parser.parse_args()
 
-    # Load scenario if specified
-    scenario = None
-    if args.scenario:
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
-        from scenarios import load_scenario
-        scenario = load_scenario(args.scenario)
-        # Override goal from scenario unless explicitly provided
-        if args.goal == [20.0, 7.5]:  # default not overridden
-            sc_goal = scenario['robot']['goal']
-            args.goal = list(sc_goal)
+    # Load scenario
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+    from scenarios import load_scenario
+    scenario = load_scenario(args.scenario)
+
+    # Scenario values as defaults; CLI args override
+    if args.goal is None:
+        args.goal = list(scenario['robot']['goal'])
+    if args.robot_radius is None:
+        args.robot_radius = scenario['robot'].get('radius', DEFAULT_ROBOT_RADIUS)
+    if args.obstacle_radius is None:
+        radii = [o['radius'] for o in scenario['obstacles']]
+        args.obstacle_radius = max(radii) if radii else DEFAULT_OBSTACLE_RADIUS
 
     global COLLISION_DIST
     COLLISION_DIST = args.robot_radius + args.obstacle_radius

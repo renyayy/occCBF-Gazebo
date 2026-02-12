@@ -31,7 +31,7 @@ class SensorVisualizerNode(Node):
         self.declare_parameter('robot_model', 'holonomic')
         self.declare_parameter('robot_radius', sim_config.ROBOT_RADIUS)
         self.declare_parameter('sensing_range', sim_config.SENSING_RANGE)
-        self.declare_parameter('scenario_name', 'multi_random')
+        self.declare_parameter('scenario_name', 'corner_popout')
 
         robot_model = self.get_parameter('robot_model').value
         self.is_tb3 = (robot_model == 'tb3')

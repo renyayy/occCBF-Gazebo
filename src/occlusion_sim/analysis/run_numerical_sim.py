@@ -300,7 +300,7 @@ def run_simulation(args):
 def main():
     parser = argparse.ArgumentParser(description='Run numerical simulation with data collection')
     parser.add_argument('--output', '-o', required=True, help='Output directory')
-    parser.add_argument('--scenario', '-s', default='multi_random',
+    parser.add_argument('--scenario', '-s', default='corner_popout',
                         help=f'Scenario name (available: {list_scenarios()})')
     parser.add_argument('--tf', type=float, default=300.0, help='Simulation time limit (s)')
     args = parser.parse_args()

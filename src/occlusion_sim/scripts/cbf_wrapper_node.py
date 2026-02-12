@@ -35,7 +35,7 @@ class CBFWrapperNode(Node):
         self.declare_parameter('goal_y', sim_config.DEFAULT_GOAL[1])
         self.declare_parameter('body_frame_odom', False)
         self.declare_parameter('sensing_range', sim_config.SENSING_RANGE)
-        self.declare_parameter('scenario_name', 'multi_random')
+        self.declare_parameter('scenario_name', 'corner_popout')
         self.declare_parameter('auto_shutdown', False)
         self.declare_parameter('sim_timeout', 30.0)
         self.declare_parameter('result_file', '')
@@ -212,6 +212,20 @@ class CBFWrapperNode(Node):
         auto_shutdown = self.get_parameter('auto_shutdown').value
         sim_elapsed = (now - self.sim_start_time).nanoseconds * 1e-9 if self.sim_start_time else 0.0
 
+        if auto_shutdown:
+            # 衝突検知（ゴール判定より先に行う）
+            R_ego = self.robot_spec['radius']
+            for obs in self.obs_list:
+                d = np.hypot(self.X[0, 0] - obs[0], self.X[1, 0] - obs[1])
+                if d < R_ego + obs[2]:
+                    self._write_result_and_exit('collision', sim_elapsed)
+                    return
+
+            # タイムアウト検知
+            if sim_elapsed > self.get_parameter('sim_timeout').value:
+                self._write_result_and_exit('timeout', sim_elapsed)
+                return
+
         # ゴール到達判定
         dist = np.hypot(self.goal[0, 0] - self.X[0, 0], self.goal[1, 0] - self.X[1, 0])
         if dist < sim_config.GOAL_THRESHOLD:
@@ -222,18 +236,6 @@ class CBFWrapperNode(Node):
             if auto_shutdown:
                 self._write_result_and_exit('goal_reached', sim_elapsed)
             return
-
-        if auto_shutdown:
-            # 衝突検知
-            R_ego = self.robot_spec['radius']
-            for obs in self.obs_list:
-                d = np.hypot(self.X[0, 0] - obs[0], self.X[1, 0] - obs[1])
-                if d < R_ego + obs[2]:
-                    self._write_result_and_exit('collision', sim_elapsed)
-
-            # タイムアウト検知
-            if sim_elapsed > self.get_parameter('sim_timeout').value:
-                self._write_result_and_exit('timeout', sim_elapsed)
 
         # 可視障害物のフィルタリング (センシング範囲 & オクルージョン考慮)
         visible_obs, _ = self.occlusion_manager._filter_visible_and_build_occ(
