@@ -158,8 +158,9 @@ class CBFWrapperNode(Node):
         if not self.odom_received:
             return
 
-        # 全障害物の /obstacle/state 受信を待機
+        # 全障害物の /obstacle/state 受信を待機（ゼロ速度で静止維持）
         if not self._all_obs_ready:
+            self.cmd_pub.publish(Twist())
             if len(self.obstacle_states) < self._expected_obs_count:
                 self.get_logger().info(
                     f'Waiting for obstacles: {len(self.obstacle_states)}/{self._expected_obs_count}',
@@ -168,11 +169,36 @@ class CBFWrapperNode(Node):
             self._all_obs_ready = True
 
         # /sim_start を発行してエゴ・障害物を同時開始
+        # rosbag recorder が /cbf_debug_info を購読するまで待機
         if not self._sim_started:
+            if self.debug_pub.get_subscription_count() == 0:
+                self.cmd_pub.publish(Twist())
+                self.get_logger().info(
+                    'Waiting for /cbf_debug_info subscriber (rosbag)...',
+                    throttle_duration_sec=1.0)
+                return
             self.sim_start_pub.publish(Empty())
             self.sim_start_time = self.get_clock().now()
             self._sim_started = True
+            self.last_time = self.sim_start_time
             self.get_logger().info('Published /sim_start — ego + obstacles start simultaneously')
+            # 初期状態を記録（制御前の位置）
+            now = self.sim_start_time
+            debug_msg = Float64MultiArray()
+            debug_msg.layout.dim = [MultiArrayDimension(label='cbf_debug', size=17, stride=17)]
+            debug_msg.data = [
+                float(now.nanoseconds) * 1e-9,           # 0: stamp_sec
+                float('inf'),                              # 1: h_min
+                float('inf'),                              # 2: min_dist
+                0.0, 0.0, 0.0,                            # 3-5: constraints, qp_time, intervention
+                0.0, 0.0, 0.0, 0.0,                       # 6-9: u_x, u_y, u_ref_x, u_ref_y
+                float(self.X[0, 0]), float(self.X[1, 0]), # 10-11: robot_x, robot_y
+                float(self.X[2, 0]), float(self.X[3, 0]), # 12-13: robot_vx, robot_vy
+                1.0,                                       # 14: status_ok
+                0.0, float(self._expected_obs_count),      # 15-16: visible, total
+            ]
+            self.debug_pub.publish(debug_msg)
+            return
 
         # sim time ベースで dt を動的計算
         now = self.get_clock().now()
